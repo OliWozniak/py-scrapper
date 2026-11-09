@@ -1,0 +1,17 @@
+# Profil przeglądarki – ciasteczka i sesja logowania do sklepów. NIGDY nie commitować.
+profil-przegladarki/
+
+# Pobrane aukcje (duże, zmieniają się przy każdym uruchomieniu)
+cache_aukcji.json
+
+# Raporty – generowane ze skryptu
+wyniki_*.html
+wyniki_*.csv
+wyniki.html
+wyniki.csv
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

@@ -1,0 +1,86 @@
+# ==========================================================================
+# PROFILE WYSZUKIWANIA
+# ==========================================================================
+# Każdy profil to osobny produkt. Żeby szukać czegoś nowego, skopiuj blok
+# [profile.xxx], zmień nazwę i dostosuj frazy oraz reguły. Potem:
+#     python szukaj_zarowek.py --profil xxx
+#
+# Pola profilu:
+#   opis      – krótki opis (pokazuje się w --lista i w raporcie)
+#   frazy     – co wpisać w wyszukiwarkę sklepu (każda fraza osobno)
+#   wymagane  – aukcja MUSI zawierać każdy z tych wzorców, inaczej odpada
+#   reguly    – punkty za trafienia:
+#       nazwa  – opis reguły w raporcie
+#       wzorzec – wyrażenie regularne (wielkość liter nie ma znaczenia);
+#                 zwykłe słowo też działa, np. 'filament'
+#       tytul  – punkty, gdy wzorzec jest w tytule aukcji
+#       opis   – punkty, gdy jest tylko w opisie/specyfikacji (mniej pewne)
+#       cytuj  – true = pokaż w raporcie fragmenty tekstu z trafieniem,
+#                żeby szybko zweryfikować wzrokiem
+#   Ujemne punkty = kara (np. za 230 V).
+#
+# Wzorce w apostrofach '...' są brane dosłownie (nie trzeba podwajać \).
+# W sekcji [wzorce] możesz zdefiniować powtarzalne kawałki i używać ich
+# w regułach jako @NAZWA.
+# ==========================================================================
+
+[wzorce]
+# Napięcia pasujące do 1 ogniwa Li-ion (3,0–4,2 V)
+NISKIE_V = '(?<![\d.,])(?:DC\s*)?(?:3(?:[.,]0|[.,]2|[.,]7)?|4[.,][25]|3\s*[-~/]\s*(?:4[.,]2|4[.,]5|5|6))\s*V(?:olt|DC)?\b'
+PIEC_V   = '(?<![\d.,])(?:DC\s*)?5\s*V(?:olt|DC)?\b|\bUSB\b'
+SIEC_230 = '(?<![\d.,])(?:AC\s*)?(?:85|100|110|120|220|230|240|265)\s*V\b|\bAC\s*\d{2,3}'
+CIEPLA   = '\b(?:1800|2000|2200|2400)\s*K\b|amber|bursztyn'
+
+
+# --------------------------------------------------------------------------
+[profile.zarowka]
+opis = "Gotowa żarówka E14 (najlepiej C35, filament/COG) na 3–4,2 V"
+frazy = [
+    "E14 3V LED filament bulb",
+    "E14 DC 3V candle bulb",
+    "C35 E14 3V",
+    "E14 low voltage LED bulb 3V",
+    "E14 3.7V LED bulb",
+]
+wymagane = ['\bE[\s-]?14\b']
+reguly = [
+    { nazwa = "napięcie 3–4,2 V",       wzorzec = '@NISKIE_V', tytul = 6,  opis = 3,  cytuj = true },
+    { nazwa = "5 V / USB",              wzorzec = '@PIEC_V',   tytul = 2,  opis = 1,  cytuj = true },
+    { nazwa = "kształt C35 / świeczka", wzorzec = '\bC3[57]\b|candle|świecz|swiecz|kerze', tytul = 2, opis = 1 },
+    { nazwa = "filament / COG",         wzorzec = 'filament|\bCOG\b|edison', tytul = 2, opis = 1 },
+    { nazwa = "ciepła barwa",           wzorzec = '@CIEPLA',   tytul = 1,  opis = 1 },
+    { nazwa = "zasilanie 230 V",        wzorzec = '@SIEC_230', tytul = -5, opis = -2, cytuj = true },
+]
+
+
+# --------------------------------------------------------------------------
+[profile.filament]
+opis = "Same filamenty COG 3 V do przebudowy starej żarówki"
+frazy = [
+    "LED filament 3V 38mm",
+    "COG LED filament 3V warm",
+    "flexible LED filament 3V 2200K",
+    "filament LED 3V DIY",
+]
+wymagane = ['filament|\bCOG\b']
+reguly = [
+    { nazwa = "napięcie 3 V",     wzorzec = '@NISKIE_V', tytul = 6,  opis = 3,  cytuj = true },
+    { nazwa = "długość 30–45 mm", wzorzec = '\b(?:3[0-9]|4[0-5])\s*mm\b', tytul = 2, opis = 1 },
+    { nazwa = "ciepła barwa",     wzorzec = '@CIEPLA|warm', tytul = 1, opis = 1 },
+    { nazwa = "zasilanie 230 V",  wzorzec = '@SIEC_230', tytul = -5, opis = -2, cytuj = true },
+    { nazwa = "12 V / 24 V",      wzorzec = '(?<![\d.,])(?:12|24)\s*V\b', tytul = -2, opis = 0, cytuj = true },
+]
+
+
+# --------------------------------------------------------------------------
+# PRZYKŁAD – szablon pod zupełnie inny produkt. Usuń '#' i dostosuj.
+# --------------------------------------------------------------------------
+# [profile.ladowarka]
+# opis = "Moduł ładowania Li-ion USB-C z zabezpieczeniem"
+# frazy = ["TP4056 USB-C module", "18650 charger module type-c protection"]
+# wymagane = ['TP4056|IP2312']
+# reguly = [
+#     { nazwa = "USB-C",          wzorzec = 'type[\s-]?c|usb[\s-]?c', tytul = 3, opis = 1 },
+#     { nazwa = "zabezpieczenie", wzorzec = 'protect|DW01|zabezpiecz', tytul = 2, opis = 1 },
+#     { nazwa = "micro USB",      wzorzec = 'micro[\s-]?usb', tytul = -2, opis = 0 },
+# ]
