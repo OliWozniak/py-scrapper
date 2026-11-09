@@ -31,6 +31,7 @@ import html
 import json
 import random
 import re
+import select
 import sys
 import time
 import tomllib
@@ -207,56 +208,110 @@ class Tempo:
         print(f"   (zwalniam: tempo ×{self.mnoznik:.1f})")
 
 
-def jest_captcha(page):
+class KoniecSzukania(Exception):
+    """Użytkownik wpisał 'k' podczas captchy – kończymy i robimy raport."""
+
+
+def widoczna(f, page):
+    if f == page.main_frame:
+        return True
     try:
-        urle = [page.url] + [f.url for f in page.frames]
-        if any(s in u.lower() for u in urle for s in CAPTCHA_W_URL):
-            return True
+        el = f.frame_element()
+        b = el.bounding_box()
+        return bool(b and b["width"] > 50 and b["height"] > 50) and el.is_visible()
+    except Exception:
+        return False
+
+
+def powod_captchy(page):
+    """Po czym wykryto captchę; None = brak, '?' = nie da się teraz sprawdzić."""
+    try:
+        if any(s in page.url.lower() for s in CAPTCHA_W_URL):
+            return "adres strony z weryfikacją"
         for f in page.frames:
+            # niewidoczne ramki pomijamy – AliExpress potrafi zostawić ukrytą
+            # ramkę po rozwiązanej captchy i wtedy czekalibyśmy w nieskończoność
+            if not widoczna(f, page):
+                continue
+            hit = next((s for s in CAPTCHA_W_URL if s in f.url.lower()), None)
+            if hit:
+                return f"ramka {hit}"
             try:
                 t = f.inner_text("body", timeout=1500)[:3000].lower()
             except Exception:
                 continue
-            if any(s in t for s in CAPTCHA_W_TEKSCIE):
-                return True
+            hit = next((s for s in CAPTCHA_W_TEKSCIE if s in t), None)
+            if hit:
+                return f"tekst „{hit}”"
     except Exception:
-        # strona akurat się przeładowuje – sprawdzimy za chwilę
+        return "?"  # strona akurat się przeładowuje
+    return None
+
+
+def wpisano():
+    """Linia wpisana w terminalu (bez blokowania), albo None."""
+    try:
+        gotowe, _, _ = select.select([sys.stdin], [], [], 0)
+        return sys.stdin.readline().strip().lower() if gotowe else None
+    except Exception:
         return None
-    return False
 
 
-def czekaj_na_captche(page, headless, tempo, limit_min=20):
-    """Zwraca True, jeśli była captcha (wtedy stronę trzeba pobrać ponownie)."""
-    stan = jest_captcha(page)
-    if not stan:
-        return False
+def czekaj_na_captche(page, headless, tempo, limit_min=10):
+    """'brak' – nie było captchy, 'rozwiazana' – była (stronę trzeba załadować
+    ponownie), 'pomin' – nie udało się, pomiń tę stronę."""
+    powod = powod_captchy(page)
+    if powod in (None, "?"):
+        return "brak"
     if headless:
         sys.exit("\nSklep pokazał captchę, a w trybie --headless nie da się jej rozwiązać. "
                  "Uruchom bez --headless.")
-    print("\a\n>>> CAPTCHA – rozwiąż ją w oknie przeglądarki. Skrypt czeka i sam ruszy, "
-          "gdy weryfikacja zniknie.")
-    start = time.time()
+    print(f"\a\n>>> CAPTCHA ({powod}). Rozwiąż ją w oknie przeglądarki – skrypt sam ruszy, gdy zniknie.\n"
+          f"    Możesz też wpisać w terminalu:  Enter = jedź dalej · p + Enter = pomiń tę stronę"
+          f" · k + Enter = zakończ i zrób raport")
+    start = ostatni_komunikat = time.time()
     czyste = 0
-    while czyste < 3:  # 3 kolejne sprawdzenia bez captchy = naprawdę przeszło
+    while czyste < 2:  # 2 kolejne sprawdzenia bez captchy = naprawdę przeszło
         time.sleep(2)
-        stan = jest_captcha(page)
-        czyste = czyste + 1 if stan is False else 0
-        if time.time() - start > limit_min * 60:
-            input(f">>> Minęło {limit_min} min. Naciśnij Enter, żeby kontynuować… ")
+        cmd = wpisano()
+        if cmd is not None:
+            if cmd.startswith("k"):
+                raise KoniecSzukania
+            if cmd.startswith("p"):
+                print(">>> Pomijam tę stronę.")
+                tempo.zwolnij()
+                return "pomin"
             break
-    print(">>> Weryfikacja zaliczona, odczekuję chwilę i jadę dalej.")
+        powod = powod_captchy(page)
+        czyste = czyste + 1 if powod is None else 0
+        if powod and powod != "?" and time.time() - ostatni_komunikat > 30:
+            print(f"    … nadal widzę captchę ({powod})")
+            ostatni_komunikat = time.time()
+        if time.time() - start > limit_min * 60:
+            print(f">>> {limit_min} min bez rozwiązania – pomijam tę stronę.")
+            tempo.zwolnij()
+            return "pomin"
+    print(">>> OK, jadę dalej.")
     tempo.zwolnij()
     tempo.pauza(8, 15)
-    return True
+    return "rozwiazana"
 
 
 def otworz(page, url, headless, tempo, prob=3):
     """Otwiera stronę; jeśli była captcha, po jej rozwiązaniu ładuje stronę od nowa."""
     for _ in range(prob):
-        page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        except Exception as e:
+            print(f"   błąd ładowania: {str(e).splitlines()[0]}")
+            tempo.pauza(5, 10)
+            continue
         tempo.pauza(1.5, 3)
-        if not czekaj_na_captche(page, headless, tempo):
+        stan = czekaj_na_captche(page, headless, tempo)
+        if stan == "brak":
             return True
+        if stan == "pomin":
+            return False
     print("   nie udało się otworzyć strony bez captchy – pomijam")
     return False
 
@@ -296,14 +351,71 @@ def wyglada_na_kod(t):
     return t.count("function(") + t.count("=>") > 5
 
 
-def pobierz_aukcje(page, url, headless, tempo):
-    if not otworz(page, url, headless, tempo):
-        return None
-    przewin(page, 15)  # opis na AliExpress doczytuje się dopiero po przewinięciu
-    if czekaj_na_captche(page, headless, tempo):  # captcha potrafi wyskoczyć w trakcie
-        if not otworz(page, url, headless, tempo):
-            return None
-        przewin(page, 15)
+# Odpowiedzi API AliExpress z danymi aukcji (zbierane przez page.on("response"))
+API_PDP = "mtop.aliexpress.pdp.pc.query"
+ODPOWIEDZI_API = []
+
+
+def lap_api(resp):
+    if API_PDP in resp.url:
+        ODPOWIEDZI_API.append(resp)
+
+
+def parsuj_jsonp(t):
+    t = t.strip()
+    if not t.startswith("{"):
+        t = t[t.index("(") + 1: t.rindex(")")]
+    return json.loads(t)
+
+
+def wynik_api(item_id):
+    """Ostatnia odpowiedź pdp.pc.query dla tej aukcji (dict 'result') albo None."""
+    for resp in reversed(ODPOWIEDZI_API):
+        try:
+            r = parsuj_jsonp(resp.text())["data"]["result"]
+        except Exception:
+            continue
+        pid = str((r.get("PRICE") or {}).get("productId", ""))
+        if item_id and pid and pid != item_id:
+            continue
+        return r
+    return None
+
+
+def html_na_tekst(h):
+    h = re.sub(r"(?is)<(script|style)\b.*?</\1>", " ", h)
+    h = re.sub(r"(?i)<br\s*/?>|</(p|div|li|tr|h\d)>", "\n", h)
+    h = html.unescape(re.sub(r"<[^>]+>", " ", h))
+    return "\n".join(" ".join(w.split()) for w in h.splitlines() if w.strip())
+
+
+def dane_z_api(r, ctx):
+    tytul = (r.get("PRODUCT_TITLE") or {}).get("text", "")
+    spec = [f"{p.get('attrName')}: {p.get('attrValue', '')}"
+            for p in (r.get("PRODUCT_PROP_PC") or {}).get("showedProps", []) if p.get("attrName")]
+    warianty = [
+        f"{p.get('skuPropertyName', '')}: " + " | ".join(
+            v.get("propertyValueDisplayName") or v.get("propertyValueName", "")
+            for v in p.get("skuPropertyValues", []))
+        for p in (r.get("SKU") or {}).get("skuProperties", [])
+    ]
+    cena_txt = ((r.get("PRICE") or {}).get("targetSkuPriceInfo") or {}).get("salePriceString", "")
+    opis = ""
+    url_opisu = (r.get("DESC") or {}).get("pcDescUrl")
+    if url_opisu:
+        try:
+            resp = ctx.request.get(url_opisu, timeout=20000)
+            if resp.ok:
+                opis = html_na_tekst(resp.text())
+        except Exception as e:
+            print(f"   (nie udało się pobrać opisu: {str(e).splitlines()[0]})")
+    tekst = ("SPECYFIKACJA\n" + "\n".join(spec) + "\n\nWARIANTY\n" + "\n".join(warianty)
+             + "\n\nOPIS\n" + opis)
+    return {"tytul": tytul, "tekst": tekst[:60000], "cena": cena_txt, "zrodlo": "api"}
+
+
+def dane_ze_strony(page):
+    """Stara metoda: cały tekst strony (z polecanymi produktami – mniej dokładna)."""
     tytul = ""
     for sel in ("h1", "[data-pl=product-title]", "title"):
         try:
@@ -331,8 +443,37 @@ def pobierz_aukcje(page, url, headless, tempo):
         czesci.append(" | ".join(a for a in atr if a and len(a) < 80))
     except Exception:
         pass
-    dane = {"tytul": tytul, "tekst": utnij_polecane("\n".join(czesci))[:60000]}
-    if wyglada_na_captche(dane) or (not tytul and len(dane["tekst"]) < 1500):
+    return {"tytul": tytul, "tekst": utnij_polecane("\n".join(czesci))[:60000], "zrodlo": "strona"}
+
+
+def pobierz_aukcje(page, url, headless, tempo):
+    ODPOWIEDZI_API.clear()
+    if not otworz(page, url, headless, tempo):
+        return None
+    przewin(page, 8)
+    stan = czekaj_na_captche(page, headless, tempo)  # captcha potrafi wyskoczyć w trakcie
+    if stan == "pomin":
+        return None
+    if stan == "rozwiazana":
+        ODPOWIEDZI_API.clear()
+        if not otworz(page, url, headless, tempo):
+            return None
+        przewin(page, 8)
+
+    m = re.search(r"/item/(\d+)", url)
+    if m:  # AliExpress – czyste dane z API strony
+        for _ in range(20):  # do 10 s na odpowiedź
+            r = wynik_api(m.group(1))
+            if r:
+                d = dane_z_api(r, page.context)
+                if d["tytul"]:
+                    return d
+                break
+            page.wait_for_timeout(500)
+        print("   brak danych z API – biorę tekst strony (mniej dokładnie)")
+
+    dane = dane_ze_strony(page)
+    if wyglada_na_captche(dane) or (not dane["tytul"] and len(dane["tekst"]) < 1500):
         print("   strona wygląda na pustą / weryfikację – nie zapisuję, spróbuję następnym razem")
         return None
     return dane
@@ -408,6 +549,8 @@ def main():
                     help="mnożnik przerw: 2 = dwa razy wolniej (mniej captchy)")
     ap.add_argument("--przerwa-co", type=int, default=12,
                     help="co ile aukcji dłuższa przerwa 1–2,5 min (0 = wyłącz)")
+    ap.add_argument("--odswiez", action="store_true",
+                    help="pobierz ponownie aukcje AliExpress zapisane starą metodą (tekst strony)")
     ap.add_argument("--tylko-ocena", action="store_true", help="tylko przelicz oceny z cache")
     ap.add_argument("--przegladarka", action="store_true",
                     help="tylko otwórz przeglądarkę z profilem (zaloguj się, zaakceptuj cookies)")
@@ -451,6 +594,7 @@ def main():
         with sync_playwright() as pw:
             ctx = uruchom_przegladarke(pw, a)
             page = ctx.pages[0] if ctx.pages else ctx.new_page()
+            page.on("response", lap_api)
             if a.przegladarka:
                 page.goto("https://www.aliexpress.com" if a.sklep == "aliexpress" else "https://allegro.pl")
                 input("Przeglądarka otwarta. Zaloguj się / zaakceptuj cookies, potem Enter, żeby zamknąć… ")
@@ -465,7 +609,8 @@ def main():
                     for u in zbierz_linki(page, a.sklep, fr, a.strony, a.headless, tempo):
                         if u not in linki:
                             linki.append(u)
-                do_pobrania = [u for u in linki if u not in cache][: a.max]
+                do_pobrania = [u for u in linki if u not in cache
+                               or (a.odswiez and cache[u].get("zrodlo") != "api" and "/item/" in u)][: a.max]
                 print(f"\nZnaleziono {len(linki)} aukcji, nowych do otwarcia: {len(do_pobrania)}")
 
                 for i, u in enumerate(do_pobrania, 1):
@@ -479,7 +624,7 @@ def main():
                         print(f"   błąd: {e}")
                     if i < len(do_pobrania):
                         tempo.po_aukcji(a.przerwa_co)
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, KoniecSzukania):
                 print("\nPrzerwano – robię raport z tego, co już pobrane.")
             finally:
                 try:
@@ -495,7 +640,7 @@ def main():
         o, powody, cytaty = ocen(d["tytul"], d["tekst"], profil)
         if o >= a.min_ocena:
             wyniki.append({"url": u, "tytul": d["tytul"], "ocena": o, "powody": powody,
-                           "cytaty": cytaty, "cena": cena(d["tekst"])})
+                           "cytaty": cytaty, "cena": d.get("cena") or cena(d["tekst"])})
     wyniki.sort(key=lambda r: -r["ocena"])
     baza = zapisz_raport(wyniki, nazwa, profil, a.sklep)
     print(f"\nGotowe: {len(wyniki)} pasujących aukcji → {baza.name}.html, {baza.name}.csv")
