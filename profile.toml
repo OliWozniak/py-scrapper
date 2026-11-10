@@ -8,7 +8,15 @@
 # Pola profilu:
 #   opis      – krótki opis (pokazuje się w --lista i w raporcie)
 #   frazy     – co wpisać w wyszukiwarkę sklepu (każda fraza osobno)
+#   frazy_pl  – (opcjonalnie) frazy po polsku dla polskich sklepów (Allegro);
+#               AliExpress używa 'frazy' (najlepiej po angielsku)
+#   frazy_<sklep> – (opcjonalnie) frazy tylko dla jednego sklepu, np. frazy_allegro;
+#               kolejność: frazy_<sklep> → frazy_pl → frazy
+#   sklepy    – (opcjonalnie) w których sklepach szukać, gdy nie podasz --sklep;
+#               dostępne: aliexpress, allegro (kolejne: SKLEPY_TODO.md)
 #   wymagane  – aukcja MUSI zawierać każdy z tych wzorców, inaczej odpada
+#   wymagane_tytul – (opcjonalnie) wzorce, które musi mieć już TYTUŁ na liście
+#               wyników, żeby aukcja w ogóle została otwarta (oszczędza czas)
 #   reguly    – punkty za trafienia:
 #       nazwa  – opis reguły w raporcie
 #       wzorzec – wyrażenie regularne (wielkość liter nie ma znaczenia);
@@ -33,18 +41,26 @@
 # ==========================================================================
 
 [wzorce]
-# Napięcia pasujące do 1 ogniwa Li-ion (3,0–4,2 V)
+# Napięcia pasujące do 1 ogniwa Li-ion (3,0–4,2 V) i zakresy typu "3-6V"
 NISKIE_V = '(?<![\d.,])(?:DC\s*)?(?:3(?:[.,]0|[.,]2|[.,]7)?|4[.,][25]|3\s*[-~/]\s*(?:4[.,]2|4[.,]5|5|6))\s*V(?:olt|DC)?\b'
-PIEC_V   = '(?<![\d.,])(?:DC\s*)?5\s*V(?:olt|DC)?\b|\bUSB\b'
-# Niskie napięcia samochodowe/kempingowe: 6 / 12 / 24 V
-NISKIE_12 = '(?<![\d.,])(?:DC\s*)?(?:6|12|24)\s*V(?:olt|DC)?\b'
+# 4,5–6 V: 3 paluszki AA, USB 5 V, akumulator 6 V
+# (bez myślnika przed liczbą – inaczej łapałby przedział kategorii "0–5 V")
+V5_6     = '(?<![\d.,–-])(?:DC\s*)?(?:4[.,]5|5|6)\s*V(?:olt|DC)?\b|\bUSB\b'
+# 12 V (także AC/DC 12V i zakresy obejmujące 12 V, np. "12-24V", "9-30V")
+V12      = '(?<![\d.,])(?:AC\s*/?\s*)?(?:DC\s*)?12\s*V(?:olt|DC)?\b|(?<![\d.,])(?:9|10|12)\s*[-–~/]\s*(?:24|30|60|80|85)\s*V\b'
+# 6 / 12 / 24 V – instalacje samochodowe/kempingowe
+V12_24   = '(?<![\d.,])(?:DC\s*)?(?:12|24)\s*V(?:olt|DC)?\b'
 SIEC_230 = '(?<![\d.,])(?:AC\s*)?(?:85|100|110|120|220|230|240|265)\s*V\b|\bAC\s*\d{2,3}'
 CIEPLA   = '\b(?:1800|2000|2200|2400)\s*K\b|amber|bursztyn'
+# Żarówki samochodowe (trzonki i oznaczenia), które pasują do "12V czerwona", ale nie do E27
+SAMOCHOD = 'samochod|motoryzac|\bcanbus\b|homologac|\bBA[UWY]?15[sd]?\b|\b[WP](?:5|10|16|21|27)W\b|\bP2[17]/|\bW2[.,]?1?x\d|\bT[45]\b|\b(?:1156|1157|3156|3157|7440|7443)\b'
+CZERWONY = '\bred\b|czerwon|\brot\b|\brouge\b'
 
 
 # --------------------------------------------------------------------------
 [profile.zarowka]
-opis = "Gotowa żarówka E14 (najlepiej C35, filament/COG) na 3–4,2 V"
+opis = "Gotowa żarówka E14 (najlepiej C35, filament/COG) na 3–6 V"
+sklepy = ["aliexpress", "allegro"]
 frazy = [
     "E14 3V LED filament bulb",
     "E14 DC 3V candle bulb",
@@ -52,43 +68,89 @@ frazy = [
     "E14 low voltage LED bulb 3V",
     "E14 3.7V LED bulb",
     "E14 battery operated LED bulb",
-    "E14 12V LED filament bulb",
-    "E14 DC12V candle bulb",
+    "E14 5V LED bulb",
+    "E14 6V LED bulb",
+]
+frazy_pl = [
+    "żarówka E14 3V",
+    "żarówka E14 6V",
+    "żarówka E14 niskonapięciowa",
+    "żarówka LED E14 5V",
+    "żarówka świeczka E14 3V",
 ]
 wymagane = ['\bE[\s-]?14\b']
+wymagane_tytul = ['\bE[\s-]?14\b']
 reguly = [
     { nazwa = "napięcie 3–4,2 V",       wzorzec = '@NISKIE_V', tytul = 6,  spec = 6,  opis = 2,  cytuj = true },
+    { nazwa = "napięcie 4,5–6 V / USB", wzorzec = '@V5_6',     tytul = 4,  spec = 4,  opis = 1,  cytuj = true },
     # AliExpress często wpisuje w specyfikację tylko przedział kategorii, np. "Napięcie: 0–5 V"
-    { nazwa = "napięcie 0–5 V (kategoria)", wzorzec = '\b0\s*[-–]\s*5\s*V\b', tytul = 0, spec = 3, opis = 0, cytuj = true },
-    { nazwa = "5 V / USB",              wzorzec = '@PIEC_V',   tytul = 2,  spec = 2,  opis = 1,  cytuj = true },
-    { nazwa = "6 / 12 / 24 V",          wzorzec = '@NISKIE_12', tytul = 3, spec = 3,  opis = 1,  cytuj = true },
-    # przedział kategorii "11-50 V" bywa wpisany nawet przy żarówkach 230 V – słaba wskazówka
-    { nazwa = "napięcie 11–50 V (kategoria)", wzorzec = '\b11\s*[-–]\s*50\s*V\b', tytul = 0, spec = 1, opis = 0 },
+    { nazwa = "napięcie 0–5 V (kategoria)", wzorzec = '\b0\s*[-–]\s*5\s*V\b', tytul = 0, spec = 3, opis = 0 },
     { nazwa = "kształt C35 / świeczka", wzorzec = '\bC3[57]\b|candle|świecz|swiecz|kerze', tytul = 2, opis = 1 },
     { nazwa = "filament / COG",         wzorzec = 'filament|\bCOG\b|edison', tytul = 2, opis = 1 },
     { nazwa = "ciepła barwa",           wzorzec = '@CIEPLA',   tytul = 1,  opis = 1 },
-    # Kara za 230 V – chyba że w tym samym miejscu jest też niskie napięcie
-    # (aukcja z wariantami, np. "220V | 12V") – wtedy reguła się nie liczy.
-    { nazwa = "zasilanie 230 V",        wzorzec = '@SIEC_230', chyba_ze = '@NISKIE_V|@NISKIE_12', tytul = -8, spec = -6, opis = -2, cytuj = true },
+    # 12/24 V to już za dużo – kara, chyba że w tym samym miejscu jest też wariant 3–6 V
+    { nazwa = "12 / 24 V",              wzorzec = '@V12_24', chyba_ze = '@NISKIE_V|@V5_6', tytul = -3, spec = -3, opis = 0, cytuj = true },
+    { nazwa = "napięcie 11–50 V (kategoria)", wzorzec = '\b11\s*[-–]\s*50\s*V\b', tytul = 0, spec = -1, opis = 0 },
+    # Kara za 230 V – chyba że w tym samym miejscu jest też wariant 3–6 V
+    # (aukcja z wariantami, np. "220V | 3V") – wtedy reguła się nie liczy.
+    { nazwa = "zasilanie 230 V",        wzorzec = '@SIEC_230', chyba_ze = '@NISKIE_V|@V5_6', tytul = -8, spec = -6, opis = -2, cytuj = true },
 ]
 
 
 # --------------------------------------------------------------------------
 [profile.filament]
 opis = "Same filamenty COG 3 V do przebudowy starej żarówki"
+sklepy = ["aliexpress", "allegro"]
 frazy = [
     "LED filament 3V 38mm",
     "COG LED filament 3V warm",
     "flexible LED filament 3V 2200K",
     "filament LED 3V DIY",
 ]
-wymagane = ['filament|\bCOG\b']
+frazy_pl = [
+    "filament LED 3V",
+    "żarnik LED 3V",
+    "dioda filament COB 3V",
+]
+wymagane = ['filament|\bCOG\b|żarnik']
 reguly = [
     { nazwa = "napięcie 3 V",     wzorzec = '@NISKIE_V', tytul = 6,  spec = 6,  opis = 2,  cytuj = true },
     { nazwa = "długość 30–45 mm", wzorzec = '\b(?:3[0-9]|4[0-5])\s*mm\b', tytul = 2, opis = 1 },
     { nazwa = "ciepła barwa",     wzorzec = '@CIEPLA|warm', tytul = 1, opis = 1 },
     { nazwa = "zasilanie 230 V",  wzorzec = '@SIEC_230', chyba_ze = '@NISKIE_V', tytul = -8, spec = -6, opis = -2, cytuj = true },
-    { nazwa = "12 V / 24 V",      wzorzec = '(?<![\d.,])(?:12|24)\s*V\b', tytul = -2, spec = -2, opis = 0, cytuj = true },
+    { nazwa = "12 V / 24 V",      wzorzec = '@V12_24', chyba_ze = '@NISKIE_V', tytul = -2, spec = -2, opis = 0, cytuj = true },
+]
+
+
+# --------------------------------------------------------------------------
+[profile.czerwona_e27_12v]
+opis = "Czerwona żarówka E27 na 12 V"
+sklepy = ["allegro", "aliexpress"]
+frazy = [
+    "E27 12V red LED bulb",
+    "E27 DC12V red light bulb",
+    "red LED bulb E27 12V 24V",
+    "E27 12V colored bulb red",
+    "E27 low voltage red bulb",
+]
+frazy_pl = [
+    "żarówka E27 12V czerwona",
+    "żarówka LED E27 12V czerwona",
+    "żarówka czerwona E27 12V DC",
+    "żarówka E27 12V kolorowa",
+]
+# E27 i kolor czerwony muszą się gdzieś pojawić (kolor bywa tylko w wariantach)
+wymagane = ['\bE[\s-]?27\b', '@CZERWONY']
+wymagane_tytul = ['\bE[\s-]?27\b']
+reguly = [
+    { nazwa = "napięcie 12 V",       wzorzec = '@V12',      tytul = 6,  spec = 5,  opis = 2,  cytuj = true },
+    { nazwa = "gwint E27",           wzorzec = '\bE[\s-]?27\b', tytul = 2, spec = 0, opis = 0 },
+    { nazwa = "promiennik / podczerwień", wzorzec = 'podczerwie|grzewcz|promiennik|infrared|\bIR\b', tytul = -8, spec = -6, opis = -2 },
+    { nazwa = "żarówka samochodowa", wzorzec = '@SAMOCHOD',  tytul = -10, spec = -6, opis = -3, cytuj = true },
+    { nazwa = "kolor czerwony",      wzorzec = '@CZERWONY', tytul = 3,  spec = 3,  opis = 1,  cytuj = true },
+    { nazwa = "RGB / wiele kolorów", wzorzec = '\bRGB\b|multicolou?r|wielokolor', tytul = -1, spec = 0, opis = 0 },
+    { nazwa = "tylko 24 V",          wzorzec = '(?<![\d.,-])24\s*V\b', chyba_ze = '@V12', tytul = -2, spec = -2, opis = 0, cytuj = true },
+    { nazwa = "zasilanie 230 V",     wzorzec = '@SIEC_230', chyba_ze = '@V12', tytul = -8, spec = -6, opis = -3, cytuj = true },
 ]
 
 
@@ -98,6 +160,9 @@ reguly = [
 # [profile.ladowarka]
 # opis = "Moduł ładowania Li-ion USB-C z zabezpieczeniem"
 # frazy = ["TP4056 USB-C module", "18650 charger module type-c protection"]
+# frazy_pl = ["moduł ładowania TP4056 USB-C"]
+# sklepy = ["aliexpress", "allegro"]
+# frazy_pl = ["moduł ładowania TP4056 USB-C"]
 # wymagane = ['TP4056|IP2312']
 # reguly = [
 #     { nazwa = "USB-C",          wzorzec = 'type[\s-]?c|usb[\s-]?c', tytul = 3, opis = 1 },

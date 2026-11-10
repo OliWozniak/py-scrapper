@@ -8,7 +8,7 @@ Wynik to raport HTML/CSV posortowany od najlepszych trafień. Przy każdej aukcj
 za które dostała punkty, więc szybko sprawdzisz trafienie bez otwierania aukcji.
 
 Czego szukać, definiujesz w pliku [`profile.toml`](profile.toml). Wbudowane przykłady szukają
-żarówek E14 na 3–4,2 V i filamentów LED 3 V, ale w ten sam sposób opiszesz dowolny inny produkt
+żarówek E14 na 3–6 V, filamentów LED 3 V i czerwonych żarówek E27 na 12 V, ale w ten sam sposób opiszesz dowolny inny produkt
 (zobacz [Edycja profile.toml](#edycja-profiletoml)).
 
 ## Spis treści
@@ -35,14 +35,19 @@ Czego szukać, definiujesz w pliku [`profile.toml`](profile.toml). Wbudowane prz
    - **AliExpress:** przechwytuje dane, które strona i tak pobiera ze swojego API: tytuł,
      specyfikację (np. `Voltage: 3V`), warianty, cenę i opis sprzedawcy. Nie ma w nich reklam ani
      poleconych produktów, więc dane są czyste.
-   - **Allegro** (oraz AliExpress, gdy API nie odpowie): skrypt czyta tekst całej strony, co jest mniej dokładne.
+   - **Allegro:** tytuł, cenę i opis bierze z danych produktu zapisanych w stronie (JSON-LD),
+     a parametry (np. „Rodzaj gwintu”, „Barwa światła”) z sekcji „Parametry”. Polecane i
+     sponsorowane oferty nie są czytane.
+   - Gdy tych danych nie ma, skrypt czyta tekst całej strony, co jest mniej dokładne.
 4. **Ocena.** Każda reguła z profilu sprawdza tytuł, specyfikację i opis, po czym przyznaje lub
    odejmuje punkty.
-5. **Raport.** Wyniki trafiają do `wyniki_<profil>_<sklep>.html` i `.csv`. Raport odświeża się po
-   każdej aukcji, więc możesz go mieć otwartego w przeglądarce i odświeżać w trakcie.
+5. **Raport.** Wyniki ze wszystkich sklepów trafiają do jednego raportu `wyniki_<profil>.html`
+   i `.csv`, z kolumną „Sklep”, więc łatwo porównać ceny. Raport odświeża się po każdej aukcji, więc możesz go mieć otwartego w przeglądarce i odświeżać w trakcie.
 
-Pobrane aukcje zapisują się w `cache_aukcji.json`. Kolejne uruchomienia nie pobierają ich drugi raz,
-a po zmianie reguł możesz przeliczyć oceny bez internetu (`--tylko-ocena`).
+Pobrane aukcje zapisują się w `dane/cache_<profil>_<sklep>.json`, osobno dla każdego profilu i sklepu.
+Kolejne uruchomienia nie pobierają ich drugi raz, a po zmianie reguł możesz przeliczyć oceny bez
+internetu (`--tylko-ocena`). Do zapisanego profilu możesz wrócić choćby po miesiącach:
+`--lista` pokazuje, ile aukcji ma każdy profil i kiedy był ostatnio uruchamiany.
 
 ## Instalacja
 
@@ -89,7 +94,7 @@ python scrapper.py --przegladarka
 
 W oknie zaakceptuj cookies i najlepiej **zaloguj się na AliExpress**. Zalogowany użytkownik
 dostaje dużo mniej captchy. Gotowe? Wróć do terminala i naciśnij Enter. Sesja zapisuje się w katalogu
-`profil-przegladarki/` i zostaje na kolejne uruchomienia. Dla Allegro dodaj `--sklep allegro`.
+`profil-przegladarki/` i zostaje na kolejne uruchomienia. Otwierają się wszystkie sklepy z profilu.
 
 **2. Zrób małe próbne wyszukiwanie:**
 
@@ -110,7 +115,7 @@ postęp w terminalu. Po każdej aukcji zobaczysz podgląd oceny:
 Znaczki: **★** to mocne trafienie (≥ 8 pkt), **+** trafi do raportu, **·** jest poniżej progu,
 a **✗** odpada (brak wymaganego słowa).
 
-**3. Otwórz raport** `wyniki_zarowka_aliexpress.html` w przeglądarce. Zielone wiersze to mocne trafienia,
+**3. Otwórz raport** `wyniki_zarowka.html` w przeglądarce. Zielone wiersze to mocne trafienia,
 żółte są do sprawdzenia.
 
 Działa? Uruchom pełne wyszukiwanie: `python scrapper.py`.
@@ -118,7 +123,9 @@ Działa? Uruchom pełne wyszukiwanie: `python scrapper.py`.
 ## Captcha
 
 Sklepy nie lubią automatycznego przeglądania i co jakiś czas pokazują weryfikację „nie jestem robotem”.
-Skrypt sam ją wykrywa: wydaje dźwięk, wypisuje komunikat i **czeka**.
+Skrypt sam ją wykrywa: odtwarza dźwięk systemowy, pokazuje powiadomienie na pulpicie
+(na Linuksie przez `paplay`/`pw-play` i `notify-send`), wypisuje komunikat i **czeka**.
+Dźwięk powtarza się co 30 s przez pierwsze 3 minuty. `--cicho` wyłącza dźwięk i powiadomienia.
 
 - **Rozwiąż captchę w oknie przeglądarki.** Skrypt sam ruszy dalej, gdy weryfikacja zniknie.
 - **Albo wpisz polecenie w terminalu:**
@@ -142,9 +149,11 @@ Jak ograniczyć liczbę captchy:
 
 ```bash
 python scrapper.py --lista                          # jakie są profile
-python scrapper.py                                  # pierwszy profil z profile.toml, AliExpress
+python scrapper.py                                  # pierwszy profil, sklepy z jego pola 'sklepy'
 python scrapper.py --profil filament                # inny profil
-python scrapper.py --profil filament --sklep allegro
+python scrapper.py --profil filament --sklep allegro          # tylko jeden sklep
+python scrapper.py --profil zarowka --sklep aliexpress allegro # wybrane sklepy
+python scrapper.py --profil zarowka --sklep wszystkie         # wszystkie obsługiwane sklepy
 python scrapper.py --frazy "E14 3V candle" "C35 DC3V"   # własne frazy, reguły z profilu
 python scrapper.py --tylko-ocena                    # przelicz raport po zmianie reguł (bez internetu)
 python scrapper.py --tylko-ocena --min-ocena -50    # pokaż w raporcie prawie wszystko
@@ -160,6 +169,19 @@ python scrapper.py --frazy "TP4056 type-c" "18650 charger module" \
     --wymagane "TP4056|IP2312" --plus "type-?c" "protect" --minus "micro ?usb"
 ```
 
+**Kilka wyszukiwań naraz.** Każdy profil i sklep ma własny cache i własną kopię przeglądarki
+w `dane/`, więc możesz uruchomić kilka skryptów w osobnych terminalach:
+
+```bash
+python scrapper.py --profil zarowka                       # terminal 1
+python scrapper.py --profil czerwona_e27_12v --sklep allegro   # terminal 2
+```
+
+Kopia przeglądarki powstaje przy pierwszym uruchomieniu profilu z głównego `profil-przegladarki/`
+(tego z `--przegladarka`), więc zalogowanie przechodzi. Ten sam profil i sklep naraz w dwóch
+terminalach się nie uruchomi. Każde okno to osobne zapytania z tego samego adresu IP, więc przy
+kilku naraz captcha może pojawiać się częściej. Wtedy pomoże `--tempo 2`.
+
 **`--odswiez`** dotyczy wpisów z cache pobranych starszą wersją skryptu (z tekstu całej strony,
 razem z reklamami innych produktów). Takie wpisy z AliExpress są pomijane w raporcie, bo nie da się
 ich wiarygodnie ocenić. Skrypt podaje na końcu, ile ich jest. `--odswiez` pobiera je ponownie, już przez API.
@@ -169,12 +191,12 @@ ich wiarygodnie ocenić. Skrypt podaje na końcu, ile ich jest. `--odswiez` pobi
 | Opcja | Domyślnie | Opis |
 |---|---|---|
 | `--profil NAZWA` | pierwszy w pliku | profil z `profile.toml` |
-| `--sklep` | `aliexpress` | `aliexpress` albo `allegro` |
+| `--sklep S …` | z profilu | sklep(y): `aliexpress`, `allegro` albo `wszystkie`; bez tej opcji sklepy z pola `sklepy` profilu (a gdy go nie ma, `aliexpress`) |
 | `--lista` | | pokaż profile i zakończ |
 | `--frazy F1 F2 …` | z profilu | własne frazy wyszukiwania |
 | `--wymagane`, `--plus`, `--minus` | | jednorazowy profil z linii poleceń |
 | `--strony N` | 2 | ile stron wyników na każdą frazę |
-| `--max N` | 40 | ile najwyżej aukcji otworzyć w tym uruchomieniu |
+| `--max N` | 40 | ile najwyżej aukcji otworzyć w tym uruchomieniu (w każdym sklepie) |
 | `--prog-listy N` | 0 | otwieraj tylko aukcje, których tytuł na liście wyników ma ≥ N pkt; `-99` = wszystkie |
 | `--min-ocena N` | 3 | aukcje z niższą oceną nie trafiają do raportu |
 | `--tempo X` | 1.0 | mnożnik przerw (2 = dwa razy wolniej) |
@@ -183,6 +205,7 @@ ich wiarygodnie ocenić. Skrypt podaje na końcu, ile ich jest. `--odswiez` pobi
 | `--tylko-ocena` | | nic nie pobieraj, tylko przelicz raport z cache |
 | `--przegladarka` | | tylko otwórz okno (logowanie, cookies) |
 | `--chrome ŚCIEŻKA` | | użyj innej przeglądarki, np. `/usr/bin/chromium` |
+| `--cicho` | | bez dźwięku i powiadomień przy captchy |
 | `--headless` | | bez okna; captchy nie da się wtedy rozwiązać, niezalecane |
 
 ---
@@ -217,7 +240,11 @@ Nazwa profilu to tekst po `profile.`. Używaj liter bez polskich znaków, cyfr i
 |---|---|---|
 | `opis` | nie | krótki opis, pokazywany w `--lista` i w nagłówku raportu |
 | `frazy` | tak | lista fraz wpisywanych w wyszukiwarkę sklepu; każda jest szukana osobno |
+| `frazy_pl` | nie | frazy po polsku dla polskich sklepów (Allegro); AliExpress używa `frazy` |
+| `frazy_<sklep>` | nie | frazy tylko dla jednego sklepu, np. `frazy_allegro`; kolejność: `frazy_<sklep>` → `frazy_pl` → `frazy` |
+| `sklepy` | nie | w których sklepach szukać, gdy nie podasz `--sklep`, np. `["aliexpress", "allegro"]` |
 | `wymagane` | nie | lista wzorców, które aukcja **musi** zawierać (każdy z nich), inaczej od razu odpada |
+| `wymagane_tytul` | nie | wzorce, które musi mieć już **tytuł na liście wyników**, żeby aukcja w ogóle została otwarta, np. gwint `'\bE[\s-]?27\b'`; oszczędza czas i captche |
 | `reguly` | tak | lista reguł punktowych, opisanych niżej |
 
 **Frazy** to zwykły tekst, taki jak wpisałbyś w wyszukiwarkę. Na AliExpress lepiej działają frazy
@@ -368,8 +395,9 @@ python -c "import re; print(re.findall(r'(?<![\d.,])12\s*V\b', 'zasilanie 12V, n
 | `scrapper.py` | tak | skrypt |
 | `profile.toml` | tak | profile wyszukiwania |
 | `README.md` | tak | ten plik |
+| `SKLEPY_TODO.md` | tak | jak działają strony sklepów i jak dodać kolejny (TME, Kamami, Botland, eBay) |
 | `profil-przegladarki/` | **nigdy** | cookies i sesja logowania do sklepów, czyli dostęp do Twojego konta |
-| `cache_aukcji.json` | nie | pobrane aukcje (duże, zmieniają się co uruchomienie) |
+| `dane/` | **nigdy** | cache aukcji i kopie przeglądarki dla każdego profilu (kopie zawierają cookies) |
 | `wyniki_*.html`, `wyniki_*.csv` | nie | raporty, do odtworzenia przez `--tylko-ocena` |
 
 Wszystko, co „nie”, jest już w `.gitignore`.
@@ -409,7 +437,7 @@ says 3 V, −5 if it says 230 V". The output is an HTML/CSV report sorted best-f
 the report shows the text snippets that earned its points, so you can verify a match without opening it.
 
 What to search for is defined in [`profile.toml`](profile.toml). The bundled profiles look for
-E14 LED bulbs running on 3–4.2 V and 3 V LED filaments, but any other product can be described
+E14 LED bulbs running on 3–6 V, 3 V LED filaments and red 12 V E27 bulbs, but any other product can be described
 the same way (see [Editing profile.toml](#editing-profiletoml)).
 
 > **About the Polish names.** The command-line options, TOML keys and terminal messages are in Polish.
@@ -427,15 +455,20 @@ the same way (see [Editing profile.toml](#editing-profiletoml)).
    - **AliExpress:** the script captures the data the page already loads from AliExpress's own API
      (`mtop.aliexpress.pdp.pc.query`): title, item specifics (e.g. `Voltage: 3V`), variants, price
      and the seller's description. That data contains no ads or "recommended" products, so it is clean.
-   - **Allegro** (and AliExpress, if the API data does not arrive): the script falls back to reading
-     the whole page text, which is less accurate.
+   - **Allegro:** title, price and description come from the product data embedded in the page
+     (JSON-LD), and item parameters (e.g. "Rodzaj gwintu" = socket type, "Barwa światła" = light
+     colour) from the "Parametry" section. Recommended and sponsored offers are not read.
+   - If that data is missing, the script falls back to reading the whole page text, which is less accurate.
 4. **Scoring.** Each rule in the profile checks the title, the specification and the description,
    and adds or subtracts points.
-5. **Report.** Results go to `wyniki_<profile>_<shop>.html` and `.csv` ("wyniki" = results).
+5. **Report.** Results from all shops go to one report, `wyniki_<profile>.html` and `.csv`
+   ("wyniki" = results), with a "Sklep" (shop) column for easy price comparison.
    The report is rewritten after every listing, so you can keep it open in a browser and refresh it while the search runs.
 
-Downloaded listings are cached in `cache_aukcji.json`. Later runs skip them, and after changing
-your rules you can re-score everything offline with `--tylko-ocena`.
+Downloaded listings are cached in `dane/cache_<profile>_<shop>.json`, separately for each profile and
+shop. Later runs skip them, and after changing your rules you can re-score everything offline with
+`--tylko-ocena`. You can come back to a saved profile months later: `--lista` shows how many listings
+each profile has and when it last ran.
 
 ## Installation
 
@@ -476,7 +509,7 @@ python scrapper.py --przegladarka
 
 A browser window opens. Accept the cookies and, ideally, **log in to AliExpress**: logged-in users
 get far fewer captchas. Then press Enter in the terminal. The session is stored in
-`profil-przegladarki/` and reused on later runs. For Allegro add `--sklep allegro`.
+`profil-przegladarki/` and reused on later runs. All shops of the profile are opened.
 
 **2. Do a small test search:**
 
@@ -496,12 +529,14 @@ Leave the browser window alone (you can minimise it). After each listing the ter
 `ocena` = score. Markers: **★** strong match (≥ 8 points), **+** goes into the report,
 **·** below the threshold, **✗** rejected (a required pattern is missing).
 
-**3. Open the report** `wyniki_zarowka_aliexpress.html`. Green rows are strong matches, yellow rows are worth checking.
+**3. Open the report** `wyniki_zarowka.html`. Green rows are strong matches, yellow rows are worth checking.
 
 ## Captchas
 
-When a shop shows a "you are not a robot" check, the script detects it, beeps, prints a message
-and **waits**.
+When a shop shows a "you are not a robot" check, the script detects it, plays a system sound,
+shows a desktop notification (on Linux via `paplay`/`pw-play` and `notify-send`), prints a message
+and **waits**. The sound repeats every 30 s for the first 3 minutes. `--cicho` (quiet) turns sound
+and notifications off.
 
 - **Solve the captcha in the browser window.** The script continues on its own once the check is gone.
 - **Or type a command in the terminal:**
@@ -524,8 +559,10 @@ To get fewer captchas:
 
 ```bash
 python scrapper.py --lista                          # list profiles
-python scrapper.py                                  # first profile in profile.toml, AliExpress
-python scrapper.py --profil filament --sklep allegro
+python scrapper.py                                  # first profile, shops from its 'sklepy' field
+python scrapper.py --profil filament --sklep allegro           # one shop only
+python scrapper.py --profil zarowka --sklep aliexpress allegro # chosen shops
+python scrapper.py --profil zarowka --sklep wszystkie          # all supported shops ("wszystkie" = all)
 python scrapper.py --frazy "E14 3V candle" "C35 DC3V"   # custom phrases, rules from the profile
 python scrapper.py --tylko-ocena                    # re-score from cache after editing rules (offline)
 python scrapper.py --tylko-ocena --min-ocena -50    # show almost everything in the report
@@ -541,6 +578,19 @@ python scrapper.py --frazy "TP4056 type-c" "18650 charger module" \
     --wymagane "TP4056|IP2312" --plus "type-?c" "protect" --minus "micro ?usb"
 ```
 
+**Several searches at once.** Each profile and shop has its own cache and its own browser copy in
+`dane/`, so you can run several scripts in separate terminals:
+
+```bash
+python scrapper.py --profil zarowka                            # terminal 1
+python scrapper.py --profil czerwona_e27_12v --sklep allegro   # terminal 2
+```
+
+The browser copy is created on a profile's first run from the main `profil-przegladarki/` (the one
+`--przegladarka` opens), so your login carries over. The same profile and shop cannot run in two
+terminals at once. Every window sends requests from the same IP address, so with several running
+captchas may show up more often. `--tempo 2` helps.
+
 **`--odswiez`** (refresh) applies to cache entries saved by an older version of the script, which read
 the whole page text, ads included. Such AliExpress entries are left out of the report because they
 can't be scored reliably. The script tells you at the end how many there are. `--odswiez` downloads them again through the API.
@@ -550,12 +600,12 @@ can't be scored reliably. The script tells you at the end how many there are. `-
 | Option | Meaning | Default | Description |
 |---|---|---|---|
 | `--profil NAME` | profile | first in file | profile from `profile.toml` |
-| `--sklep` | shop | `aliexpress` | `aliexpress` or `allegro` |
+| `--sklep S …` | shop(s) | from profile | `aliexpress`, `allegro` or `wszystkie` (all); without it, the profile's `sklepy` field (or `aliexpress`) |
 | `--lista` | list | | list profiles and exit |
 | `--frazy P1 P2 …` | phrases | from profile | custom search phrases |
 | `--wymagane` / `--plus` / `--minus` | required / plus / minus | | one-off profile from the command line |
 | `--strony N` | pages | 2 | result pages per phrase |
-| `--max N` | | 40 | max listings to open in this run |
+| `--max N` | | 40 | max listings to open in this run (per shop) |
 | `--prog-listy N` | list threshold | 0 | only open listings whose title on the results page scores ≥ N; `-99` = open all |
 | `--min-ocena N` | min score | 3 | listings scoring lower are left out of the report |
 | `--tempo X` | pace | 1.0 | pause multiplier (2 = twice as slow) |
@@ -564,6 +614,7 @@ can't be scored reliably. The script tells you at the end how many there are. `-
 | `--tylko-ocena` | scoring only | | don't download anything, just rebuild the report from cache |
 | `--przegladarka` | browser | | only open the browser window (log in, accept cookies) |
 | `--chrome PATH` | | | use another browser binary, e.g. `/usr/bin/chromium` |
+| `--cicho` | quiet | | no sound or notifications on captchas |
 | `--headless` | | | no window; captchas cannot be solved, not recommended |
 
 ---
@@ -583,7 +634,11 @@ One profile = one product. You can have as many as you like and pick one with `-
 | `[profile.NAME]` | a profile called NAME |
 | `opis` (in a profile) | description of the profile |
 | `frazy` | search phrases |
+| `frazy_pl` | Polish search phrases (for Allegro) |
+| `frazy_<shop>` | phrases for one shop only |
+| `sklepy` | shops to search |
 | `wymagane` | required patterns |
+| `wymagane_tytul` | patterns required in the title on the results page |
 | `reguly` | scoring rules |
 | `nazwa` | rule name |
 | `wzorzec` | pattern |
@@ -618,7 +673,11 @@ The profile name is the part after `profile.`. Use plain ASCII letters, digits a
 |---|---|---|
 | `opis` | no | short description, shown by `--lista` and in the report header |
 | `frazy` | yes | phrases typed into the shop's search box, each searched separately |
+| `frazy_pl` | no | Polish phrases for Polish shops (Allegro); AliExpress uses `frazy` |
+| `frazy_<shop>` | no | phrases for one shop only, e.g. `frazy_allegro`; order: `frazy_<shop>` → `frazy_pl` → `frazy` |
+| `sklepy` | no | which shops to search when `--sklep` isn't given, e.g. `["aliexpress", "allegro"]` |
 | `wymagane` | no | patterns a listing **must** contain (every one of them), otherwise it is rejected immediately |
+| `wymagane_tytul` | no | patterns the **title on the results page** must contain for the listing to be opened at all, e.g. the socket `'\bE[\s-]?27\b'`; saves time and captchas |
 | `reguly` | yes | scoring rules, described below |
 
 **Phrases** are plain text, as you would type them into the search box. On AliExpress, English phrases
@@ -769,8 +828,9 @@ python -c "import re; print(re.findall(r'(?<![\d.,])12\s*V\b', 'power 12V, not 1
 | `scrapper.py` | yes | the script |
 | `profile.toml` | yes | search profiles |
 | `README.md` | yes | this file |
+| `SKLEPY_TODO.md` | yes | how the shops' pages work and how to add another (TME, Kamami, Botland, eBay); in Polish |
 | `profil-przegladarki/` | **never** | browser cookies and shop login session, i.e. access to your account |
-| `cache_aukcji.json` | no | downloaded listings (large, changes on every run) |
+| `dane/` | **never** | per-profile listing cache and browser copies (the copies contain cookies) |
 | `wyniki_*.html`, `wyniki_*.csv` | no | reports, rebuildable with `--tylko-ocena` |
 
 Everything marked "no" is already in `.gitignore`.
