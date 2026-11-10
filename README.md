@@ -1,4 +1,6 @@
-# Szukacz aukcji AliExpress / Allegro
+# py-scrapper: szukacz aukcji AliExpress / Allegro
+
+**🇵🇱 Polski** · [🇬🇧 English version below](#english)
 
 Skrypt przeszukuje AliExpress (lub Allegro) według podanych fraz, otwiera każdą znalezioną aukcję
 i **ocenia ją punktowo** według Twoich reguł, np. „+6 za napięcie 3 V w specyfikacji, −5 za 230 V”.
@@ -68,7 +70,7 @@ Przy każdym kolejnym uruchomieniu najpierw aktywuj środowisko (`source .venv/b
 Sprawdzenie, czy wszystko działa (to polecenie nie łączy się z internetem):
 
 ```bash
-python szukaj_zarowek.py --lista
+python scrapper.py --lista
 ```
 
 Powinna się pojawić lista profili z `profile.toml`.
@@ -78,7 +80,7 @@ Powinna się pojawić lista profili z `profile.toml`.
 **1. Przygotuj profil przeglądarki (zalecane).** Otwórz okno przeglądarki, którego będzie używał skrypt:
 
 ```bash
-python szukaj_zarowek.py --przegladarka
+python scrapper.py --przegladarka
 ```
 
 W oknie zaakceptuj cookies i najlepiej **zaloguj się na AliExpress**. Zalogowany użytkownik
@@ -88,7 +90,7 @@ dostaje dużo mniej captchy. Gotowe? Wróć do terminala i naciśnij Enter. Sesj
 **2. Zrób małe próbne wyszukiwanie:**
 
 ```bash
-python szukaj_zarowek.py --strony 1 --max 10
+python scrapper.py --strony 1 --max 10
 ```
 
 Skrypt otworzy okno przeglądarki (zostaw je w spokoju, możesz je zminimalizować) i będzie wypisywał
@@ -107,7 +109,7 @@ a **✗** odpada (brak wymaganego słowa).
 **3. Otwórz raport** `wyniki_zarowka_aliexpress.html` w przeglądarce. Zielone wiersze to mocne trafienia,
 żółte są do sprawdzenia.
 
-Działa? Uruchom pełne wyszukiwanie: `python szukaj_zarowek.py`.
+Działa? Uruchom pełne wyszukiwanie: `python scrapper.py`.
 
 ## Captcha
 
@@ -135,14 +137,14 @@ Jak ograniczyć liczbę captchy:
 ## Codzienne użycie
 
 ```bash
-python szukaj_zarowek.py --lista                          # jakie są profile
-python szukaj_zarowek.py                                  # pierwszy profil z profile.toml, AliExpress
-python szukaj_zarowek.py --profil filament                # inny profil
-python szukaj_zarowek.py --profil filament --sklep allegro
-python szukaj_zarowek.py --frazy "E14 3V candle" "C35 DC3V"   # własne frazy, reguły z profilu
-python szukaj_zarowek.py --tylko-ocena                    # przelicz raport po zmianie reguł (bez internetu)
-python szukaj_zarowek.py --tylko-ocena --min-ocena -50    # pokaż w raporcie prawie wszystko
-python szukaj_zarowek.py --odswiez --max 60               # pobierz ponownie stare wpisy (patrz niżej)
+python scrapper.py --lista                          # jakie są profile
+python scrapper.py                                  # pierwszy profil z profile.toml, AliExpress
+python scrapper.py --profil filament                # inny profil
+python scrapper.py --profil filament --sklep allegro
+python scrapper.py --frazy "E14 3V candle" "C35 DC3V"   # własne frazy, reguły z profilu
+python scrapper.py --tylko-ocena                    # przelicz raport po zmianie reguł (bez internetu)
+python scrapper.py --tylko-ocena --min-ocena -50    # pokaż w raporcie prawie wszystko
+python scrapper.py --odswiez --max 60               # pobierz ponownie stare wpisy (patrz niżej)
 ```
 
 **Jednorazowe wyszukiwanie bez edycji pliku.** Gdy podasz `--wymagane`, `--plus` lub `--minus`, skrypt
@@ -150,7 +152,7 @@ tworzy tymczasowy profil `wlasny`. Za wzorce z `--plus` daje +3 (tytuł/specyfik
 a za wzorce z `--minus` −5 albo −2:
 
 ```bash
-python szukaj_zarowek.py --frazy "TP4056 type-c" "18650 charger module" \
+python scrapper.py --frazy "TP4056 type-c" "18650 charger module" \
     --wymagane "TP4056|IP2312" --plus "type-?c" "protect" --minus "micro ?usb"
 ```
 
@@ -312,8 +314,8 @@ reguly = [
 Następnie:
 
 ```bash
-python szukaj_zarowek.py --lista                                  # czy profil się wczytał
-python szukaj_zarowek.py --profil ladowarka --strony 1 --max 10   # próba
+python scrapper.py --lista                                  # czy profil się wczytał
+python scrapper.py --profil ladowarka --strony 1 --max 10   # próba
 ```
 
 ### Dopracowywanie reguł
@@ -324,7 +326,7 @@ python szukaj_zarowek.py --profil ladowarka --strony 1 --max 10   # próba
    Dobra aukcja nisko? Sprawdź, jak sprzedawca zapisuje dane (np. „DC3V”, „3 Volt”) i poszerz wzorzec.
 3. **Popraw `profile.toml`** i przelicz raport **bez ponownego pobierania**:
    ```bash
-   python szukaj_zarowek.py --profil ladowarka --tylko-ocena
+   python scrapper.py --profil ladowarka --tylko-ocena
    ```
 4. **Żeby zobaczyć też odrzucone aukcje**, dodaj `--min-ocena -50`.
 
@@ -351,7 +353,7 @@ python -c "import re; print(re.findall(r'(?<![\d.,])12\s*V\b', 'zasilanie 12V, n
 
 | Plik | Do repo? | Co to |
 |---|---|---|
-| `szukaj_zarowek.py` | tak | skrypt |
+| `scrapper.py` | tak | skrypt |
 | `profile.toml` | tak | profile wyszukiwania |
 | `README.md` | tak | ten plik |
 | `profil-przegladarki/` | **nigdy** | cookies i sesja logowania do sklepów, czyli dostęp do Twojego konta |
@@ -379,3 +381,389 @@ Sklepy w regulaminach zwykle zabraniają automatycznego przeglądania. Skrypt je
 okazjonalnego, prywatnego szukania produktów. Robi długie przerwy, otwiera strony jak zwykły
 użytkownik i nie omija zabezpieczeń (captchę rozwiązujesz sam). Nie ustawiaj dużego `--max`
 ani małego `--tempo`.
+
+---
+---
+
+<a id="english"></a>
+
+# py-scrapper: AliExpress / Allegro listing finder (English)
+
+[🇵🇱 Polska wersja powyżej](#py-scrapper-szukacz-aukcji-aliexpress--allegro)
+
+The script searches AliExpress (or Allegro, a Polish marketplace) for the phrases you give it,
+opens every listing it finds and **scores it** with your own rules, e.g. "+6 if the specification
+says 3 V, −5 if it says 230 V". The output is an HTML/CSV report sorted best-first. Every listing in
+the report shows the text snippets that earned its points, so you can verify a match without opening it.
+
+What to search for is defined in [`profile.toml`](profile.toml). The bundled profiles look for
+E14 LED bulbs running on 3–4.2 V and 3 V LED filaments, but any other product can be described
+the same way (see [Editing profile.toml](#editing-profiletoml)).
+
+> **About the Polish names.** The command-line options, TOML keys and terminal messages are in Polish.
+> The tables below translate every one of them. Search phrases and patterns can be in any language.
+
+## How it works
+
+1. **Collecting links.** The script opens a real Chromium window (via Playwright), runs each phrase
+   from the profile through the shop's search and collects listing links from a few result pages.
+2. **Downloading listings.** It opens each listing.
+   - **AliExpress:** the script captures the data the page already loads from AliExpress's own API
+     (`mtop.aliexpress.pdp.pc.query`): title, item specifics (e.g. `Voltage: 3V`), variants, price
+     and the seller's description. That data contains no ads or "recommended" products, so it is clean.
+   - **Allegro** (and AliExpress, if the API data does not arrive): the script falls back to reading
+     the whole page text, which is less accurate.
+3. **Scoring.** Each rule in the profile checks the title, the specification and the description,
+   and adds or subtracts points.
+4. **Report.** Results go to `wyniki_<profile>_<shop>.html` and `.csv` ("wyniki" = results).
+   The report is rewritten after every listing, so you can keep it open in a browser and refresh it while the search runs.
+
+Downloaded listings are cached in `cache_aukcji.json`. Later runs skip them, and after changing
+your rules you can re-score everything offline with `--tylko-ocena`.
+
+## Installation
+
+Requires **Python 3.11+** (for the built-in `tomllib`) and **Playwright** with Chromium. No other dependencies.
+
+**Arch Linux:**
+
+```bash
+sudo pacman -S python-playwright
+python -m playwright install chromium
+```
+
+**Any other OS (Debian/Ubuntu, Fedora, macOS, Windows), using a virtual environment:**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install playwright
+python -m playwright install chromium
+```
+
+Activate the environment before every run. On Debian/Ubuntu, if Chromium fails to start because of
+missing system libraries, run `sudo python -m playwright install-deps chromium`.
+
+Check that everything works (this command does not go online):
+
+```bash
+python scrapper.py --lista       # lists the profiles from profile.toml
+```
+
+## First run
+
+**1. Prepare the browser profile (recommended):**
+
+```bash
+python scrapper.py --przegladarka
+```
+
+A browser window opens. Accept the cookies and, ideally, **log in to AliExpress**: logged-in users
+get far fewer captchas. Then press Enter in the terminal. The session is stored in
+`profil-przegladarki/` and reused on later runs. For Allegro add `--sklep allegro`.
+
+**2. Do a small test search:**
+
+```bash
+python scrapper.py --strony 1 --max 10
+```
+
+Leave the browser window alone (you can minimise it). After each listing the terminal prints a preview:
+
+```
+[3/10] https://www.aliexpress.com/item/1005010775885139.html
+   · ocena +0  83,68zł  Żarówki LED C35 E14 3W, spiralne żarówki do kandelabrów, 220V…
+     kształt C35 / świeczka w tytule (+2); filament / COG w tytule (+2); zasilanie 230 V w tytule (-5)
+     [zasilanie 230 V · spec] Napięcie: 220-240 V
+```
+
+`ocena` = score. Markers: **★** strong match (≥ 8 points), **+** goes into the report,
+**·** below the threshold, **✗** rejected (a required pattern is missing).
+
+**3. Open the report** `wyniki_zarowka_aliexpress.html`. Green rows are strong matches, yellow rows are worth checking.
+
+## Captchas
+
+When a shop shows a "you are not a robot" check, the script detects it, beeps, prints a message
+and **waits**.
+
+- **Solve the captcha in the browser window.** The script continues on its own once the check is gone.
+- **Or type a command in the terminal:**
+  - just **Enter**: "solved, carry on",
+  - **`p`** + Enter: skip this listing,
+  - **`k`** + Enter: stop and build the report from what has been downloaded so far.
+- **Timeout:** after 10 minutes without a solution the listing is skipped automatically.
+- **Ctrl+C:** stops at any time and still writes the report.
+
+To get fewer captchas:
+
+- **Log in** with `--przegladarka`.
+- **Slow down:** `--tempo 2` doubles every pause, and `--przerwa-co 8` adds a long break
+  (1–2.5 min) every 8 listings. Each captcha also slows the script down automatically.
+- **Fetch fewer at once:** use a smaller `--max`. Thanks to the cache, the next run picks up where this one stopped.
+- **Use a regular browser:** system Chromium instead of Playwright's build, e.g.
+  `--chrome /usr/bin/chromium`. reCAPTCHA usually rates it better.
+
+## Everyday use
+
+```bash
+python scrapper.py --lista                          # list profiles
+python scrapper.py                                  # first profile in profile.toml, AliExpress
+python scrapper.py --profil filament --sklep allegro
+python scrapper.py --frazy "E14 3V candle" "C35 DC3V"   # custom phrases, rules from the profile
+python scrapper.py --tylko-ocena                    # re-score from cache after editing rules (offline)
+python scrapper.py --tylko-ocena --min-ocena -50    # show almost everything in the report
+python scrapper.py --odswiez --max 60               # re-download old cache entries (see below)
+```
+
+**One-off search without editing the file.** Passing `--wymagane`, `--plus` or `--minus` builds a
+temporary profile named `wlasny`. `--plus` patterns give +3 (title/spec) or +1 (description),
+and `--minus` patterns give −5 or −2:
+
+```bash
+python scrapper.py --frazy "TP4056 type-c" "18650 charger module" \
+    --wymagane "TP4056|IP2312" --plus "type-?c" "protect" --minus "micro ?usb"
+```
+
+**`--odswiez`** (refresh) applies to cache entries saved by an older version of the script, which read
+the whole page text, ads included. Such AliExpress entries are scored on the title only and are
+marked "stary wpis" (old entry) in the report. `--odswiez` downloads them again through the API.
+
+## All options
+
+| Option | Meaning | Default | Description |
+|---|---|---|---|
+| `--profil NAME` | profile | first in file | profile from `profile.toml` |
+| `--sklep` | shop | `aliexpress` | `aliexpress` or `allegro` |
+| `--lista` | list | | list profiles and exit |
+| `--frazy P1 P2 …` | phrases | from profile | custom search phrases |
+| `--wymagane` / `--plus` / `--minus` | required / plus / minus | | one-off profile from the command line |
+| `--strony N` | pages | 2 | result pages per phrase |
+| `--max N` | | 40 | max listings to open in this run |
+| `--min-ocena N` | min score | 3 | listings scoring lower are left out of the report |
+| `--tempo X` | pace | 1.0 | pause multiplier (2 = twice as slow) |
+| `--przerwa-co N` | break every | 12 | long break every N listings; 0 = off |
+| `--odswiez` | refresh | | re-download old AliExpress cache entries |
+| `--tylko-ocena` | scoring only | | don't download anything, just rebuild the report from cache |
+| `--przegladarka` | browser | | only open the browser window (log in, accept cookies) |
+| `--chrome PATH` | | | use another browser binary, e.g. `/usr/bin/chromium` |
+| `--headless` | | | no window; captchas cannot be solved, not recommended |
+
+---
+
+<a id="editing-profiletoml"></a>
+
+## Editing profile.toml
+
+[`profile.toml`](profile.toml) tells the script **what to search for** and **how to score** what it finds.
+One profile = one product. You can have as many as you like and pick one with `--profil`.
+
+### Key names: Polish → English
+
+| TOML key | Meaning |
+|---|---|
+| `[wzorce]` | patterns: shared pattern snippets, used as `@NAME` |
+| `[profile.NAME]` | a profile called NAME |
+| `opis` (in a profile) | description of the profile |
+| `frazy` | search phrases |
+| `wymagane` | required patterns |
+| `reguly` | scoring rules |
+| `nazwa` | rule name |
+| `wzorzec` | pattern |
+| `tytul` | points when found in the **title** |
+| `spec` | points when found in the **specification / variants** |
+| `opis` (in a rule) | points when found only in the **description** |
+| `cytuj` | quote: show matching lines in the report |
+
+### File layout
+
+```toml
+[wzorce]                     # (optional) shared pattern snippets, used as @NAME
+NISKIE_V = '...'
+
+[profile.zarowka]            # profile called "zarowka"  →  --profil zarowka
+opis = "..."
+frazy = [ ... ]
+wymagane = [ ... ]
+reguly = [ ... ]
+
+[profile.filament]           # another profile
+...
+```
+
+The profile name is the part after `profile.`. Use plain ASCII letters, digits and `_`, e.g.
+`[profile.usbc_charger]`. The first profile in the file is the default.
+
+### Profile fields
+
+| Field | Required | What it is |
+|---|---|---|
+| `opis` | no | short description, shown by `--lista` and in the report header |
+| `frazy` | yes | phrases typed into the shop's search box, each searched separately |
+| `wymagane` | no | patterns a listing **must** contain (every one of them), otherwise it is rejected immediately |
+| `reguly` | yes | scoring rules, described below |
+
+**Phrases** are plain text, as you would type them into the search box. On AliExpress, English phrases
+work best (that is how sellers describe products). On Allegro, use Polish. Several different phrases
+find more different listings. Each phrase × `--strony` is a separate set of result pages to go through.
+
+**Required patterns** are a quick filter. For example `wymagane = ['\bE[\s-]?14\b']` drops anything
+that never mentions an E14 socket. They are checked against the title, specification and description combined.
+
+### Rules
+
+Each rule is one line in curly braces:
+
+```toml
+reguly = [
+    { nazwa = "voltage 3–4.2 V", wzorzec = '@NISKIE_V', tytul = 6, spec = 6, opis = 2, cytuj = true },
+    { nazwa = "filament / COG",  wzorzec = 'filament|\bCOG\b', tytul = 2, opis = 1 },
+]
+```
+
+| Field | Default | Meaning |
+|---|---|---|
+| `nazwa` | (required) | rule name shown in the report and terminal |
+| `wzorzec` | (required) | what to look for: a plain word or a regular expression (case-insensitive) |
+| `tytul` | 0 | points when the pattern is **in the title** |
+| `spec` | = `tytul` | points when it is **in the item specifics or variants** (e.g. `Voltage: 3V`, a variant button "DC3V") |
+| `opis` | 0 | points when it is **only in the seller's description** |
+| `cytuj` | `false` | `true` = show the matching lines in the report for a quick visual check |
+
+**How scoring works:**
+
+- **Only the most reliable match counts:** title first, then specification, then description.
+  If "3V" appears both in the title and in the description, the rule gives only the `tytul` points, not both.
+- **Negative points are penalties.** All rules apply together: a listing with "3V" in the description
+  (+2) and "220V" in the specification (−5) ends up at −3.
+- **The final score is the sum of all rules.** In the report, ≥ 8 is a green row and ≥ 4 is yellow.
+  Tune the points so that an ideal listing reaches 8 or more, while a mere keyword match stays lower.
+- **The seller's description is the least reliable source.** It often lists every possible variant
+  and voltage at once, so give it fewer points than the title and the specification.
+- **Old AliExpress entries** (saved before the API version) have an empty specification and description,
+  so only the `tytul` points apply to them.
+
+### Writing patterns
+
+A pattern is a [Python regular expression](https://docs.python.org/3/library/re.html), but plain words
+are enough to start with. Matching is case-insensitive.
+
+| To find | Pattern | Notes |
+|---|---|---|
+| the word "filament" | `'filament'` | also matches "filaments" |
+| one of several words | `'candle\|świecz\|kerze'` | `\|` means "or" |
+| the whole word "COG" | `'\bCOG\b'` | `\b` = word boundary, so "COGNAC" won't match |
+| E14, E-14, E 14 | `'\bE[\s-]?14\b'` | `[\s-]?` = optional space or hyphen |
+| C35 or C37 | `'\bC3[57]\b'` | `[57]` = one character from the list |
+| 3V, 3 V, 3.7V, 3,7 V | `'\b3(?:[.,]7)?\s*V\b'` | `(?:…)?` = optional part, `\s*` = any spaces |
+| 12 V but not 112 V or 1.2 V | `'(?<![\d.,])12\s*V\b'` | `(?<![\d.,])` = "not preceded by a digit, dot or comma" |
+| length 30–45 mm | `'\b(?:3[0-9]\|4[0-5])\s*mm\b'` | |
+| 1800–2400 K | `'\b(?:1800\|2000\|2200\|2400)\s*K\b'` | |
+
+Characters with a special meaning: `. + * ? ( ) [ ] { } | \ ^ $`. To match them literally, put `\`
+in front, e.g. `'DC\+'` or `'1\.5W'`.
+
+**Quotes.** Write patterns in **single quotes** `'...'`. TOML then takes the text literally, so `\b`
+and `\d` work without doubling the backslash. In double quotes `"..."` you would need `\\b`.
+If the pattern itself contains an apostrophe, use triple quotes: `'''don't'''`.
+
+**Shared patterns `[wzorce]`.** Define a long pattern used in several places once:
+
+```toml
+[wzorce]
+MAINS = '(?<![\d.,])(?:AC\s*)?(?:110|220|230|240)\s*V\b'
+```
+
+and use it in rules as `@MAINS`. It can be combined with other text, e.g. `wzorzec = '@CIEPLA|warm'`.
+The name after `@` must exactly match a name in `[wzorce]`.
+
+### Example: a new profile from scratch
+
+We want a 1S Li-ion charging module with USB-C: a TP4056 or IP2312 chip with battery protection,
+and no micro-USB. Append this to `profile.toml`:
+
+```toml
+[profile.charger]
+opis = "1S Li-ion charging module with USB-C and protection"
+frazy = [
+    "TP4056 type-c module protection",
+    "18650 charger board usb-c",
+    "IP2312 charging module",
+]
+wymagane = ['TP4056|IP2312']
+reguly = [
+    { nazwa = "USB-C",      wzorzec = 'type[\s-]?c|usb[\s-]?c', tytul = 4, spec = 3, opis = 1 },
+    { nazwa = "protection", wzorzec = 'protect|DW01|zabezpiecz', tytul = 3, spec = 3, opis = 1, cytuj = true },
+    { nazwa = "1 A current", wzorzec = '\b1(?:[.,]0)?\s*A\b|1000\s*mA', tytul = 1, opis = 1 },
+    { nazwa = "micro USB",  wzorzec = 'micro[\s-]?usb', tytul = -4, spec = -2, opis = 0 },
+]
+```
+
+Then:
+
+```bash
+python scrapper.py --lista                                 # did the profile load?
+python scrapper.py --profil charger --strony 1 --max 10    # test run
+```
+
+### Tuning the rules
+
+1. **Run a small search** and look at the report.
+2. **Look for wrong scores.** A bad listing ranked high? Check the snippets column to see what earned
+   it points. Usually the pattern needs tightening (add `\b`, `(?<![\d.,])`) or you need a penalty rule.
+   A good listing ranked low? Check how the seller writes it ("DC3V", "3 Volt", …) and widen the pattern.
+3. **Edit `profile.toml`** and re-score **without downloading again**:
+   ```bash
+   python scrapper.py --profil charger --tylko-ocena
+   ```
+4. **To see rejected listings too**, add `--min-ocena -50`.
+
+Quick pattern test in Python:
+
+```bash
+python -c "import re; print(re.findall(r'(?<![\d.,])12\s*V\b', 'power 12V, not 112V or 1.2 V', re.I))"
+```
+
+### Common mistakes
+
+- **`Błąd w profile.toml: ...`** (error in profile.toml): TOML syntax. Usually a missing comma between
+  rules, a comma placed between fields inside `{ }`, or an unclosed bracket. Each rule `{ ... }`
+  must stay on **one line**.
+- **`błędny wzorzec`** (invalid pattern): the regular expression is broken, e.g. an unclosed `(`.
+  The message names the profile and the error.
+- **`nieznany wzorzec @NAME`** (unknown pattern): a typo in the name, or it is missing from `[wzorce]`.
+- **A rule never matches:** check `\b` next to digits and units. `'\b3V\b'` does not match "DC3V",
+  because there is no word boundary between "C" and "3". Use `(?<![\d.,])` there instead.
+
+---
+
+## Files
+
+| File | In the repo? | What it is |
+|---|---|---|
+| `scrapper.py` | yes | the script |
+| `profile.toml` | yes | search profiles |
+| `README.md` | yes | this file |
+| `profil-przegladarki/` | **never** | browser cookies and shop login session, i.e. access to your account |
+| `cache_aukcji.json` | no | downloaded listings (large, changes on every run) |
+| `wyniki_*.html`, `wyniki_*.csv` | no | reports, rebuildable with `--tylko-ocena` |
+
+Everything marked "no" is already in `.gitignore`.
+
+## Troubleshooting
+
+- **`Brak Playwright`** (Playwright missing): install it (see [Installation](#installation)).
+  If you use a venv, make sure it is active.
+- **`Executable doesn't exist ... chromium`**: the browser is missing. Run `python -m playwright install chromium`.
+- **Stuck on a captcha you already solved**: press Enter in the terminal. Every 30 s the script prints
+  what still looks like a captcha to it (`nadal widzę captchę`). Include that line when reporting a bug.
+- **"brak danych z API" (no API data) on every listing**: AliExpress has probably changed its page.
+  The script carries on with the old page-text method, but less accurately.
+- **Zero links found in search results**: the shop may have changed its URLs. Check what the browser
+  window shows. It may also be a captcha or a cookie banner, in which case run `--przegladarka`.
+
+## Note
+
+Shops' terms of service usually forbid automated browsing. This script is meant for occasional,
+personal product searches. It pauses a lot, loads pages like a normal user and does not bypass any
+protection (you solve captchas yourself). Don't set a large `--max` or a low `--tempo`.

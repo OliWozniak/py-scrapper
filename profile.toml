@@ -3,7 +3,7 @@
 # ==========================================================================
 # Każdy profil to osobny produkt. Żeby szukać czegoś nowego, skopiuj blok
 # [profile.xxx], zmień nazwę i dostosuj frazy oraz reguły. Potem:
-#     python szukaj_zarowek.py --profil xxx
+#     python scrapper.py --profil xxx
 #
 # Pola profilu:
 #   opis      – krótki opis (pokazuje się w --lista i w raporcie)

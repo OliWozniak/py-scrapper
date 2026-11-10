@@ -11,14 +11,14 @@ Jak działa:
 
 Czego szukać – definiujesz w profile.toml (jeden blok = jeden produkt).
 Szybkie jednorazowe wyszukiwanie bez edycji pliku:
-    python szukaj_zarowek.py --frazy "TP4056 type-c" --wymagane TP4056 --plus "type-?c" --minus "micro ?usb"
+    python scrapper.py --frazy "TP4056 type-c" --wymagane TP4056 --plus "type-?c" --minus "micro ?usb"
 
 Przykłady:
-    python szukaj_zarowek.py --lista                 # pokaż dostępne profile
-    python szukaj_zarowek.py                         # profil zarowka, AliExpress
-    python szukaj_zarowek.py --profil filament --sklep allegro
-    python szukaj_zarowek.py --tylko-ocena           # przelicz z cache, bez internetu
-    python szukaj_zarowek.py --przegladarka          # otwórz okno, żeby się zalogować
+    python scrapper.py --lista                 # pokaż dostępne profile
+    python scrapper.py                         # profil zarowka, AliExpress
+    python scrapper.py --profil filament --sklep allegro
+    python scrapper.py --tylko-ocena           # przelicz z cache, bez internetu
+    python scrapper.py --przegladarka          # otwórz okno, żeby się zalogować
 
 Captcha: gdy sklep pokaże weryfikację, skrypt to wykryje, zapiszczy i CZEKA,
 aż ją rozwiążesz w oknie przeglądarki – potem sam rusza dalej (nie trzeba
