@@ -14,7 +14,11 @@
 #       wzorzec – wyrażenie regularne (wielkość liter nie ma znaczenia);
 #                 zwykłe słowo też działa, np. 'filament'
 #       tytul  – punkty, gdy wzorzec jest w tytule aukcji
-#       opis   – punkty, gdy jest tylko w opisie/specyfikacji (mniej pewne)
+#       spec   – punkty, gdy jest w specyfikacji lub wariantach (np. "Napięcie: 3V");
+#                to dane wpisane przez sprzedawcę w formularz, więc dość pewne.
+#                Gdy pominiesz, przyjmuje wartość z 'tytul'.
+#       opis   – punkty, gdy jest tylko w opisie sprzedawcy (najmniej pewne)
+#   Liczy się tylko najpewniejsze miejsce trafienia (tytuł > spec > opis).
 #       cytuj  – true = pokaż w raporcie fragmenty tekstu z trafieniem,
 #                żeby szybko zweryfikować wzrokiem
 #   Ujemne punkty = kara (np. za 230 V).
@@ -44,12 +48,12 @@ frazy = [
 ]
 wymagane = ['\bE[\s-]?14\b']
 reguly = [
-    { nazwa = "napięcie 3–4,2 V",       wzorzec = '@NISKIE_V', tytul = 6,  opis = 3,  cytuj = true },
-    { nazwa = "5 V / USB",              wzorzec = '@PIEC_V',   tytul = 2,  opis = 1,  cytuj = true },
+    { nazwa = "napięcie 3–4,2 V",       wzorzec = '@NISKIE_V', tytul = 6,  spec = 6,  opis = 2,  cytuj = true },
+    { nazwa = "5 V / USB",              wzorzec = '@PIEC_V',   tytul = 2,  spec = 2,  opis = 1,  cytuj = true },
     { nazwa = "kształt C35 / świeczka", wzorzec = '\bC3[57]\b|candle|świecz|swiecz|kerze', tytul = 2, opis = 1 },
     { nazwa = "filament / COG",         wzorzec = 'filament|\bCOG\b|edison', tytul = 2, opis = 1 },
     { nazwa = "ciepła barwa",           wzorzec = '@CIEPLA',   tytul = 1,  opis = 1 },
-    { nazwa = "zasilanie 230 V",        wzorzec = '@SIEC_230', tytul = -5, opis = -2, cytuj = true },
+    { nazwa = "zasilanie 230 V",        wzorzec = '@SIEC_230', tytul = -5, spec = -5, opis = -2, cytuj = true },
 ]
 
 
@@ -64,11 +68,11 @@ frazy = [
 ]
 wymagane = ['filament|\bCOG\b']
 reguly = [
-    { nazwa = "napięcie 3 V",     wzorzec = '@NISKIE_V', tytul = 6,  opis = 3,  cytuj = true },
+    { nazwa = "napięcie 3 V",     wzorzec = '@NISKIE_V', tytul = 6,  spec = 6,  opis = 2,  cytuj = true },
     { nazwa = "długość 30–45 mm", wzorzec = '\b(?:3[0-9]|4[0-5])\s*mm\b', tytul = 2, opis = 1 },
     { nazwa = "ciepła barwa",     wzorzec = '@CIEPLA|warm', tytul = 1, opis = 1 },
-    { nazwa = "zasilanie 230 V",  wzorzec = '@SIEC_230', tytul = -5, opis = -2, cytuj = true },
-    { nazwa = "12 V / 24 V",      wzorzec = '(?<![\d.,])(?:12|24)\s*V\b', tytul = -2, opis = 0, cytuj = true },
+    { nazwa = "zasilanie 230 V",  wzorzec = '@SIEC_230', tytul = -5, spec = -5, opis = -2, cytuj = true },
+    { nazwa = "12 V / 24 V",      wzorzec = '(?<![\d.,])(?:12|24)\s*V\b', tytul = -2, spec = -2, opis = 0, cytuj = true },
 ]
 
 
