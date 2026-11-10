@@ -27,14 +27,18 @@ Czego szukać, definiujesz w pliku [`profile.toml`](profile.toml). Wbudowane prz
 
 1. **Zbieranie linków.** Skrypt otwiera prawdziwe okno przeglądarki Chromium (przez Playwright),
    wpisuje każdą frazę z profilu w wyszukiwarkę sklepu i zbiera linki do aukcji z kilku stron wyników.
-2. **Pobieranie aukcji.** Otwiera kolejne aukcje.
+2. **Wstępna ocena po tytule.** Tytuł każdej aukcji z listy wyników jest oceniany punktami `tytul`
+   z reguł, **zanim** aukcja zostanie otwarta. Aukcje poniżej `--prog-listy` (domyślnie 0 pkt, czyli np.
+   z „220V” w tytule) są pomijane, a najbardziej obiecujące otwierane jako pierwsze. Oszczędza to czas
+   i captche, bo wyszukiwarka AliExpress i tak zwraca głównie żarówki 230 V.
+3. **Pobieranie aukcji.** Otwiera kolejne aukcje.
    - **AliExpress:** przechwytuje dane, które strona i tak pobiera ze swojego API: tytuł,
      specyfikację (np. `Voltage: 3V`), warianty, cenę i opis sprzedawcy. Nie ma w nich reklam ani
      poleconych produktów, więc dane są czyste.
    - **Allegro** (oraz AliExpress, gdy API nie odpowie): skrypt czyta tekst całej strony, co jest mniej dokładne.
-3. **Ocena.** Każda reguła z profilu sprawdza tytuł, specyfikację i opis, po czym przyznaje lub
+4. **Ocena.** Każda reguła z profilu sprawdza tytuł, specyfikację i opis, po czym przyznaje lub
    odejmuje punkty.
-4. **Raport.** Wyniki trafiają do `wyniki_<profil>_<sklep>.html` i `.csv`. Raport odświeża się po
+5. **Raport.** Wyniki trafiają do `wyniki_<profil>_<sklep>.html` i `.csv`. Raport odświeża się po
    każdej aukcji, więc możesz go mieć otwartego w przeglądarce i odświeżać w trakcie.
 
 Pobrane aukcje zapisują się w `cache_aukcji.json`. Kolejne uruchomienia nie pobierają ich drugi raz,
@@ -157,8 +161,8 @@ python scrapper.py --frazy "TP4056 type-c" "18650 charger module" \
 ```
 
 **`--odswiez`** dotyczy wpisów z cache pobranych starszą wersją skryptu (z tekstu całej strony,
-razem z reklamami innych produktów). Takie wpisy z AliExpress są oceniane tylko po tytule
-i mają w raporcie dopisek „stary wpis”. `--odswiez` pobiera je ponownie, już przez API.
+razem z reklamami innych produktów). Takie wpisy z AliExpress są pomijane w raporcie, bo nie da się
+ich wiarygodnie ocenić. Skrypt podaje na końcu, ile ich jest. `--odswiez` pobiera je ponownie, już przez API.
 
 ## Wszystkie opcje
 
@@ -171,6 +175,7 @@ i mają w raporcie dopisek „stary wpis”. `--odswiez` pobiera je ponownie, ju
 | `--wymagane`, `--plus`, `--minus` | | jednorazowy profil z linii poleceń |
 | `--strony N` | 2 | ile stron wyników na każdą frazę |
 | `--max N` | 40 | ile najwyżej aukcji otworzyć w tym uruchomieniu |
+| `--prog-listy N` | 0 | otwieraj tylko aukcje, których tytuł na liście wyników ma ≥ N pkt; `-99` = wszystkie |
 | `--min-ocena N` | 3 | aukcje z niższą oceną nie trafiają do raportu |
 | `--tempo X` | 1.0 | mnożnik przerw (2 = dwa razy wolniej) |
 | `--przerwa-co N` | 12 | co ile aukcji dłuższa przerwa; 0 = wyłącz |
@@ -241,9 +246,16 @@ reguly = [
 | `spec` | = `tytul` | punkty, gdy jest **w specyfikacji lub wariantach** (np. `Voltage: 3V`, przycisk wariantu „DC3V”) |
 | `opis` | 0 | punkty, gdy jest **tylko w opisie** sprzedawcy |
 | `cytuj` | `false` | `true` = pokaż w raporcie linie z trafieniem, do szybkiej weryfikacji wzrokiem |
+| `chyba_ze` | brak | wzorzec-wyjątek: jeśli pasuje **w tym samym miejscu** co `wzorzec`, reguła się nie liczy |
 
 **Jak liczone są punkty:**
 
+- **Wyjątki (`chyba_ze`).** Aukcje z wariantami piszą np. „110V 220V 12V 24V” w jednym tytule.
+  Kara za 230 V odrzuciłaby wtedy także wariant 12 V. Dlatego reguła 230 V ma
+  `chyba_ze = '@NISKIE_V|@NISKIE_12'`: jeśli w tym samym miejscu jest też niskie napięcie, kara
+  się nie liczy (w raporcie widać „pominięte, są też inne warianty”).
+- **Wstępna ocena po tytule:** na liście wyników skrypt widzi tylko tytuł, więc liczą się wyłącznie
+  punkty `tytul`. Wyraźna kara w `tytul` (np. −8 za 230 V) odfiltrowuje takie aukcje, zanim zostaną otwarte.
 - **Liczy się tylko najpewniejsze miejsce trafienia:** tytuł, potem specyfikacja, potem opis.
   Jeśli „3V” jest i w tytule, i w opisie, reguła daje tylko punkty `tytul`, a nie sumę.
 - **Ujemne punkty to kara.** Do oceny aukcji wchodzą wszystkie reguły naraz: aukcja z „3V”
@@ -252,8 +264,8 @@ reguly = [
   Dobierz punkty tak, żeby idealna aukcja miała 8 lub więcej, a zwykłe trafienie „po słowach” mniej.
 - **Opis sprzedawcy jest najmniej wiarygodny**, bo często wymienia wszystkie możliwe warianty
   i napięcia naraz. Dawaj mu mniej punktów niż tytułowi i specyfikacji.
-- **Stare wpisy z AliExpress** (sprzed wersji z API) mają pustą specyfikację i opis, więc liczą się
-  tylko punkty `tytul`.
+- **Przedziały kategorii AliExpress** (np. „Napięcie: 0–5 V”, „11-50 V”) sprzedawcy wybierają z listy,
+  często byle jak. Traktuj je jako słabą wskazówkę (mało punktów, tylko `spec`) i nie używaj w `chyba_ze`.
 
 ### Wzorce: jak pisać
 
@@ -407,15 +419,19 @@ the same way (see [Editing profile.toml](#editing-profiletoml)).
 
 1. **Collecting links.** The script opens a real Chromium window (via Playwright), runs each phrase
    from the profile through the shop's search and collects listing links from a few result pages.
-2. **Downloading listings.** It opens each listing.
+2. **Title pre-scoring.** Each listing's title on the results page is scored with the rules' `tytul`
+   points **before** the listing is opened. Listings below `--prog-listy` (default 0, e.g. "220V" in the
+   title) are skipped, and the most promising ones are opened first. This saves time and captchas,
+   because AliExpress search returns mostly 230 V bulbs anyway.
+3. **Downloading listings.** It opens each listing.
    - **AliExpress:** the script captures the data the page already loads from AliExpress's own API
      (`mtop.aliexpress.pdp.pc.query`): title, item specifics (e.g. `Voltage: 3V`), variants, price
      and the seller's description. That data contains no ads or "recommended" products, so it is clean.
    - **Allegro** (and AliExpress, if the API data does not arrive): the script falls back to reading
      the whole page text, which is less accurate.
-3. **Scoring.** Each rule in the profile checks the title, the specification and the description,
+4. **Scoring.** Each rule in the profile checks the title, the specification and the description,
    and adds or subtracts points.
-4. **Report.** Results go to `wyniki_<profile>_<shop>.html` and `.csv` ("wyniki" = results).
+5. **Report.** Results go to `wyniki_<profile>_<shop>.html` and `.csv` ("wyniki" = results).
    The report is rewritten after every listing, so you can keep it open in a browser and refresh it while the search runs.
 
 Downloaded listings are cached in `cache_aukcji.json`. Later runs skip them, and after changing
@@ -526,8 +542,8 @@ python scrapper.py --frazy "TP4056 type-c" "18650 charger module" \
 ```
 
 **`--odswiez`** (refresh) applies to cache entries saved by an older version of the script, which read
-the whole page text, ads included. Such AliExpress entries are scored on the title only and are
-marked "stary wpis" (old entry) in the report. `--odswiez` downloads them again through the API.
+the whole page text, ads included. Such AliExpress entries are left out of the report because they
+can't be scored reliably. The script tells you at the end how many there are. `--odswiez` downloads them again through the API.
 
 ## All options
 
@@ -540,6 +556,7 @@ marked "stary wpis" (old entry) in the report. `--odswiez` downloads them again 
 | `--wymagane` / `--plus` / `--minus` | required / plus / minus | | one-off profile from the command line |
 | `--strony N` | pages | 2 | result pages per phrase |
 | `--max N` | | 40 | max listings to open in this run |
+| `--prog-listy N` | list threshold | 0 | only open listings whose title on the results page scores ≥ N; `-99` = open all |
 | `--min-ocena N` | min score | 3 | listings scoring lower are left out of the report |
 | `--tempo X` | pace | 1.0 | pause multiplier (2 = twice as slow) |
 | `--przerwa-co N` | break every | 12 | long break every N listings; 0 = off |
@@ -574,6 +591,7 @@ One profile = one product. You can have as many as you like and pick one with `-
 | `spec` | points when found in the **specification / variants** |
 | `opis` (in a rule) | points when found only in the **description** |
 | `cytuj` | quote: show matching lines in the report |
+| `chyba_ze` | "unless": exception pattern |
 
 ### File layout
 
@@ -629,9 +647,16 @@ reguly = [
 | `spec` | = `tytul` | points when it is **in the item specifics or variants** (e.g. `Voltage: 3V`, a variant button "DC3V") |
 | `opis` | 0 | points when it is **only in the seller's description** |
 | `cytuj` | `false` | `true` = show the matching lines in the report for a quick visual check |
+| `chyba_ze` | none | exception pattern: if it matches **in the same place** as `wzorzec`, the rule doesn't count |
 
 **How scoring works:**
 
+- **Exceptions (`chyba_ze`).** Multi-variant listings write e.g. "110V 220V 12V 24V" in one title.
+  A 230 V penalty would then also throw out the 12 V variant. So the 230 V rule has
+  `chyba_ze = '@NISKIE_V|@NISKIE_12'`: if a low voltage appears in the same place too, the penalty
+  is not applied (the report says "pominięte, są też inne warianty", i.e. skipped, other variants exist).
+- **Title pre-scoring:** on the results page the script only sees the title, so only the `tytul` points
+  count. A strong `tytul` penalty (e.g. −8 for 230 V) filters such listings out before they are opened.
 - **Only the most reliable match counts:** title first, then specification, then description.
   If "3V" appears both in the title and in the description, the rule gives only the `tytul` points, not both.
 - **Negative points are penalties.** All rules apply together: a listing with "3V" in the description
@@ -640,8 +665,8 @@ reguly = [
   Tune the points so that an ideal listing reaches 8 or more, while a mere keyword match stays lower.
 - **The seller's description is the least reliable source.** It often lists every possible variant
   and voltage at once, so give it fewer points than the title and the specification.
-- **Old AliExpress entries** (saved before the API version) have an empty specification and description,
-  so only the `tytul` points apply to them.
+- **AliExpress category ranges** (e.g. "Napięcie: 0–5 V", "11-50 V") are picked by sellers from a list,
+  often carelessly. Treat them as weak hints (few points, `spec` only) and don't use them in `chyba_ze`.
 
 ### Writing patterns
 

@@ -21,6 +21,10 @@
 #   Liczy się tylko najpewniejsze miejsce trafienia (tytuł > spec > opis).
 #       cytuj  – true = pokaż w raporcie fragmenty tekstu z trafieniem,
 #                żeby szybko zweryfikować wzrokiem
+#       chyba_ze – (opcjonalnie) wzorzec-wyjątek: jeśli pasuje w tym samym
+#                miejscu (tytuł / spec / opis), reguła się nie liczy
+#   Tytuły z listy wyników są oceniane (punkty 'tytul') ZANIM aukcja zostanie
+#   otwarta; poniżej --prog-listy (domyślnie 0) aukcja jest pomijana.
 #   Ujemne punkty = kara (np. za 230 V).
 #
 # Wzorce w apostrofach '...' są brane dosłownie (nie trzeba podwajać \).
@@ -32,6 +36,8 @@
 # Napięcia pasujące do 1 ogniwa Li-ion (3,0–4,2 V)
 NISKIE_V = '(?<![\d.,])(?:DC\s*)?(?:3(?:[.,]0|[.,]2|[.,]7)?|4[.,][25]|3\s*[-~/]\s*(?:4[.,]2|4[.,]5|5|6))\s*V(?:olt|DC)?\b'
 PIEC_V   = '(?<![\d.,])(?:DC\s*)?5\s*V(?:olt|DC)?\b|\bUSB\b'
+# Niskie napięcia samochodowe/kempingowe: 6 / 12 / 24 V
+NISKIE_12 = '(?<![\d.,])(?:DC\s*)?(?:6|12|24)\s*V(?:olt|DC)?\b'
 SIEC_230 = '(?<![\d.,])(?:AC\s*)?(?:85|100|110|120|220|230|240|265)\s*V\b|\bAC\s*\d{2,3}'
 CIEPLA   = '\b(?:1800|2000|2200|2400)\s*K\b|amber|bursztyn'
 
@@ -45,15 +51,25 @@ frazy = [
     "C35 E14 3V",
     "E14 low voltage LED bulb 3V",
     "E14 3.7V LED bulb",
+    "E14 battery operated LED bulb",
+    "E14 12V LED filament bulb",
+    "E14 DC12V candle bulb",
 ]
 wymagane = ['\bE[\s-]?14\b']
 reguly = [
     { nazwa = "napięcie 3–4,2 V",       wzorzec = '@NISKIE_V', tytul = 6,  spec = 6,  opis = 2,  cytuj = true },
+    # AliExpress często wpisuje w specyfikację tylko przedział kategorii, np. "Napięcie: 0–5 V"
+    { nazwa = "napięcie 0–5 V (kategoria)", wzorzec = '\b0\s*[-–]\s*5\s*V\b', tytul = 0, spec = 3, opis = 0, cytuj = true },
     { nazwa = "5 V / USB",              wzorzec = '@PIEC_V',   tytul = 2,  spec = 2,  opis = 1,  cytuj = true },
+    { nazwa = "6 / 12 / 24 V",          wzorzec = '@NISKIE_12', tytul = 3, spec = 3,  opis = 1,  cytuj = true },
+    # przedział kategorii "11-50 V" bywa wpisany nawet przy żarówkach 230 V – słaba wskazówka
+    { nazwa = "napięcie 11–50 V (kategoria)", wzorzec = '\b11\s*[-–]\s*50\s*V\b', tytul = 0, spec = 1, opis = 0 },
     { nazwa = "kształt C35 / świeczka", wzorzec = '\bC3[57]\b|candle|świecz|swiecz|kerze', tytul = 2, opis = 1 },
     { nazwa = "filament / COG",         wzorzec = 'filament|\bCOG\b|edison', tytul = 2, opis = 1 },
     { nazwa = "ciepła barwa",           wzorzec = '@CIEPLA',   tytul = 1,  opis = 1 },
-    { nazwa = "zasilanie 230 V",        wzorzec = '@SIEC_230', tytul = -5, spec = -5, opis = -2, cytuj = true },
+    # Kara za 230 V – chyba że w tym samym miejscu jest też niskie napięcie
+    # (aukcja z wariantami, np. "220V | 12V") – wtedy reguła się nie liczy.
+    { nazwa = "zasilanie 230 V",        wzorzec = '@SIEC_230', chyba_ze = '@NISKIE_V|@NISKIE_12', tytul = -8, spec = -6, opis = -2, cytuj = true },
 ]
 
 
@@ -71,7 +87,7 @@ reguly = [
     { nazwa = "napięcie 3 V",     wzorzec = '@NISKIE_V', tytul = 6,  spec = 6,  opis = 2,  cytuj = true },
     { nazwa = "długość 30–45 mm", wzorzec = '\b(?:3[0-9]|4[0-5])\s*mm\b', tytul = 2, opis = 1 },
     { nazwa = "ciepła barwa",     wzorzec = '@CIEPLA|warm', tytul = 1, opis = 1 },
-    { nazwa = "zasilanie 230 V",  wzorzec = '@SIEC_230', tytul = -5, spec = -5, opis = -2, cytuj = true },
+    { nazwa = "zasilanie 230 V",  wzorzec = '@SIEC_230', chyba_ze = '@NISKIE_V', tytul = -8, spec = -6, opis = -2, cytuj = true },
     { nazwa = "12 V / 24 V",      wzorzec = '(?<![\d.,])(?:12|24)\s*V\b', tytul = -2, spec = -2, opis = 0, cytuj = true },
 ]
 

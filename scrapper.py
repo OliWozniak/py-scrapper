@@ -108,7 +108,8 @@ def wczytaj_profile():
                 {"nazwa": r["nazwa"], "rx": re.compile(rozwin(r["wzorzec"]), re.I),
                  "tytul": int(r.get("tytul", 0)), "opis": int(r.get("opis", 0)),
                  "spec": int(r.get("spec", r.get("tytul", 0))),
-                 "cytuj": bool(r.get("cytuj", False))}
+                 "cytuj": bool(r.get("cytuj", False)),
+                 "chyba_ze": re.compile(rozwin(r["chyba_ze"]), re.I) if r.get("chyba_ze") else None}
                 for r in p.get("reguly", [])
             ]
             wymagane = [re.compile(rozwin(w), re.I) for w in p.get("wymagane", [])]
@@ -130,10 +131,10 @@ def profil_z_cli(a):
             return re.compile(w, re.I)
         except re.error:
             return re.compile(re.escape(w), re.I)
-    reguly = [{"nazwa": f"+ {w}", "rx": rx(w), "tytul": 3, "spec": 3, "opis": 1, "cytuj": True}
-              for w in a.plus or []]
-    reguly += [{"nazwa": f"− {w}", "rx": rx(w), "tytul": -5, "spec": -5, "opis": -2, "cytuj": True}
-               for w in a.minus or []]
+    reguly = [{"nazwa": f"+ {w}", "rx": rx(w), "tytul": 3, "spec": 3, "opis": 1, "cytuj": True,
+               "chyba_ze": None} for w in a.plus or []]
+    reguly += [{"nazwa": f"− {w}", "rx": rx(w), "tytul": -5, "spec": -5, "opis": -2, "cytuj": True,
+                "chyba_ze": None} for w in a.minus or []]
     return {"opis": "profil z linii poleceń", "frazy": a.frazy or [],
             "wymagane": [rx(w) for w in a.wymagane or []], "reguly": reguly}
 
@@ -180,7 +181,11 @@ def ocen(dane, profil, url=""):
         for gdzie, tekst, pkt in (("tytule", tytul, r["tytul"]), ("specyfikacji", spec, r["spec"]),
                                   ("opisie", opis, r["opis"])):
             if tekst and r["rx"].search(tekst):
-                if pkt:
+                if r["chyba_ze"] and r["chyba_ze"].search(tekst):
+                    # np. "220V | 12V" – aukcja z kilkoma wariantami, nie karzemy
+                    if pkt:
+                        powody.append(f"{r['nazwa']} w {gdzie} – pominięte, są też inne warianty")
+                elif pkt:
                     wynik += pkt
                     powody.append(f"{r['nazwa']} w {gdzie} ({pkt:+d})")
                 break
@@ -188,9 +193,22 @@ def ocen(dane, profil, url=""):
             for etykieta, tekst in (("spec", spec), ("opis", opis)):
                 for m in list(r["rx"].finditer(tekst))[:2]:
                     cytaty.append(f"[{r['nazwa']} · {etykieta}] {linia(tekst, m)}")
-    if dane.get("zrodlo") != "api" and "/item/" in url:
-        powody.append("stary wpis – oceniony tylko tytuł (użyj --odswiez)")
     return wynik, powody, cytaty
+
+
+def ocen_tytul(tytul, profil):
+    """Wstępna ocena samego tytułu z listy wyników – decyduje, czy warto otwierać aukcję."""
+    wynik, powody = 0, []
+    for r in profil["reguly"]:
+        if r["tytul"] and r["rx"].search(tytul) and not (r["chyba_ze"] and r["chyba_ze"].search(tytul)):
+            wynik += r["tytul"]
+            powody.append(f"{r['nazwa']} ({r['tytul']:+d})")
+    return wynik, powody
+
+
+def stary_wpis(url, d):
+    """Wpis AliExpress sprzed wersji z API – tekst całej strony z reklamami, bezużyteczny do oceny."""
+    return "/item/" in url and d.get("zrodlo") != "api"
 
 
 def utnij_polecane(tekst):
@@ -353,22 +371,25 @@ def przewin(page, krokow=12):
 
 def zbierz_linki(page, sklep, fraza, strony, headless, tempo):
     cfg = SKLEPY[sklep]
-    linki = []
+    linki = {}  # url -> tekst karty z listy wyników (tytuł, cena…)
     for s in range(1, strony + 1):
         url = cfg["url_wyszukiwania"](fraza, s)
         print(f"  wyniki: {url}")
         if not otworz(page, url, headless, tempo):
             break
         przewin(page, 8)
-        hrefy = page.eval_on_selector_all("a[href]", "els => els.map(e => e.href)")
+        karty = page.eval_on_selector_all(
+            "a[href]", "els => els.map(e => [e.href, (e.innerText || e.title || '').slice(0, 400)])")
         nowe = 0
-        for h in hrefy:
+        for h, tekst in karty:
             m = cfg["link"].search(h)
             if m:
                 u = cfg["normalizuj"](m)
                 if u not in linki:
-                    linki.append(u)
+                    linki[u] = ""
                     nowe += 1
+                if tekst and tekst not in linki[u]:
+                    linki[u] = (linki[u] + " " + " ".join(tekst.split()))[:600]
         print(f"    +{nowe} aukcji na tej stronie")
         if nowe == 0:
             break
@@ -565,7 +586,7 @@ td,th{{border:1px solid #ccc;padding:6px;vertical-align:top;font-size:14px}}
 def ocen_cache(cache, profil, sklep, min_ocena):
     wyniki = []
     for u, d in cache.items():
-        if sklep not in u:
+        if sklep not in u or stary_wpis(u, d):
             continue
         o, powody, cytaty = ocen(d, profil, u)
         if o >= min_ocena:
@@ -601,6 +622,9 @@ def main():
     ap.add_argument("--minus", nargs="+", help="jednorazowy profil: wzorce na minus (−5 tytuł/spec, −2 opis)")
     ap.add_argument("--strony", type=int, default=2, help="ile stron wyników na frazę")
     ap.add_argument("--max", type=int, default=40, help="maks. liczba NOWYCH aukcji do otwarcia")
+    ap.add_argument("--prog-listy", type=int, default=0,
+                    help="otwieraj tylko aukcje, których tytuł na liście wyników ma ≥ N pkt "
+                         "(-99 = otwieraj wszystkie)")
     ap.add_argument("--min-ocena", type=int, default=3, help="nie pokazuj aukcji poniżej tej oceny")
     ap.add_argument("--tempo", type=float, default=1.0,
                     help="mnożnik przerw: 2 = dwa razy wolniej (mniej captchy)")
@@ -660,19 +684,29 @@ def main():
 
             tempo = Tempo(a.tempo)
             try:
-                linki = []
+                linki = {}
                 for fr in frazy:
                     print(f"\nFraza: {fr}")
-                    for u in zbierz_linki(page, a.sklep, fr, a.strony, a.headless, tempo):
-                        if u not in linki:
-                            linki.append(u)
-                do_pobrania = [u for u in linki if u not in cache]
+                    for u, karta in zbierz_linki(page, a.sklep, fr, a.strony, a.headless, tempo).items():
+                        linki.setdefault(u, karta)
+                kandydaci = {u: k for u, k in linki.items() if u not in cache}
                 if a.odswiez:  # stare wpisy AliExpress (tekst strony z reklamami)
-                    do_pobrania += [u for u, d in cache.items() if a.sklep in u and "/item/" in u
-                                    and d.get("zrodlo") != "api" and u not in do_pobrania]
-                do_pobrania = do_pobrania[: a.max]
-                print(f"\nZnaleziono {len(linki)} aukcji, do otwarcia: {len(do_pobrania)}"
-                      f" (reszta jest już w cache)")
+                    for u, d in cache.items():
+                        if a.sklep in u and stary_wpis(u, d):
+                            kandydaci.setdefault(u, d.get("tytul", ""))
+                # wstępna ocena po tytule z listy – nie otwieramy aukcji, które już
+                # w tytule mówią np. "220V", a najlepsze kandydatki idą na początek
+                ocenione = sorted(((ocen_tytul(k, profil), u, k) for u, k in kandydaci.items()),
+                                  key=lambda x: -x[0][0])
+                do_pobrania = [u for (o, _), u, _ in ocenione if o >= a.prog_listy][: a.max]
+                pominiete = [(o, pw, k) for (o, pw), u, k in ocenione if o < a.prog_listy]
+                print(f"\nZnaleziono {len(linki)} aukcji: {len(linki) - len(kandydaci)} już w cache, "
+                      f"{len(pominiete)} odrzuconych po tytule (< {a.prog_listy} pkt), "
+                      f"do otwarcia: {len(do_pobrania)}")
+                for o, pw, k in pominiete[:5]:
+                    print(f"   ✗ {o:+d} {k[:70]}  [{', '.join(pw)}]")
+                if len(pominiete) > 5:
+                    print(f"   … i {len(pominiete) - 5} więcej")
 
                 for i, u in enumerate(do_pobrania, 1):
                     print(f"[{i}/{len(do_pobrania)}] {u}")
@@ -701,6 +735,9 @@ def main():
     wyniki = ocen_cache(cache, profil, a.sklep, a.min_ocena)
     baza = zapisz_raport(wyniki, nazwa, profil, a.sklep)
     print(f"\nGotowe: {len(wyniki)} pasujących aukcji → {baza.name}.html, {baza.name}.csv")
+    stare = sum(1 for u, d in cache.items() if a.sklep in u and stary_wpis(u, d))
+    if stare:
+        print(f"(Pominięto {stare} starych wpisów bez danych z API – pobierz je ponownie: --odswiez)")
     for r in wyniki[:10]:
         print(f"  {r['ocena']:>3}  {r['tytul'][:80]}\n       {r['url']}")
 
