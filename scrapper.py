@@ -92,6 +92,9 @@ SKLEPY = {
         "link": re.compile(r"allegro\.pl.*?(?:[?&]offerId=|/oferta/(?:[\w-]*-)?|%2Foferta%2F(?:[\w-]*-)?)(\d{8,})"),
         "normalizuj": lambda m: f"https://allegro.pl/oferta/{m.group(1)}",
         "start": "https://allegro.pl",
+        # Allegro blokuje IP po ok. 100–150 ofertach w krótkim czasie ("Zostałeś zablokowany"),
+        # więc tu zawsze wolniej i mniej na jedno uruchomienie (opcje mogą to tylko zaostrzyć)
+        "limity": {"tempo": 2.5, "max": 15, "strony": 2, "przerwa_co": 5},
         # parametry oferty: blok tekstu między nagłówkami (pary linii klucz/wartość)
         "parametry": (r"\nParametry\n", r"\n(?:WSZYSTKIE PARAMETRY|Opis)\n"),
     },
@@ -451,6 +454,37 @@ def czekaj_na_captche(page, headless, tempo, limit_min=10):
     return "rozwiazana"
 
 
+# Strona "jesteś zablokowany" – to nie captcha, nie da się jej rozwiązać; dalsze
+# zapytania tylko przedłużają blokadę, więc kończymy pracę z tym sklepem.
+BLOKADA_W_TEKSCIE = ("zostałeś zablokowany", "you have been blocked", "your access has been blocked",
+                     "dostęp został zablokowany", "access denied")
+BLOKADA_GODZIN = 24
+
+
+class SklepZablokowal(Exception):
+    """Sklep zablokował nas (np. Allegro: "Zostałeś zablokowany")."""
+
+
+def jest_blokada(page):
+    try:
+        t = (page.title() + "\n" + page.inner_text("body", timeout=3000)[:2000]).lower()
+    except Exception:
+        return False
+    return any(s in t for s in BLOKADA_W_TEKSCIE)
+
+
+def plik_blokady(sklep):
+    return DANE / f"blokada_{sklep}.txt"
+
+
+def zablokowany_od(sklep):
+    """Ile godzin temu sklep nas zablokował (None = brak zapisanej blokady)."""
+    f = plik_blokady(sklep)
+    if not f.exists():
+        return None
+    return (time.time() - f.stat().st_mtime) / 3600
+
+
 def otworz(page, url, headless, tempo, prob=3):
     """Otwiera stronę; jeśli była captcha, po jej rozwiązaniu ładuje stronę od nowa."""
     for _ in range(prob):
@@ -461,7 +495,11 @@ def otworz(page, url, headless, tempo, prob=3):
             tempo.pauza(5, 10)
             continue
         tempo.pauza(1.5, 3)
+        if jest_blokada(page):
+            raise SklepZablokowal(url)
         stan = czekaj_na_captche(page, headless, tempo)
+        if jest_blokada(page):
+            raise SklepZablokowal(url)
         if stan == "brak":
             return True
         if stan == "pomin":
@@ -835,12 +873,19 @@ def szukaj_w_sklepie(pw, a, nazwa, profil, sklep, frazy, caches):
     ctx = uruchom_przegladarke(pw, a, katalog_przegladarki(nazwa, sklep))
     page = ctx.pages[0] if ctx.pages else ctx.new_page()
     page.on("response", lap_api)
-    tempo = Tempo(a.tempo)
+    lim = SKLEPY[sklep].get("limity", {})
+    tempo = Tempo(a.tempo * lim.get("tempo", 1))
+    max_ofert = min(a.max, lim.get("max", a.max))
+    strony = min(a.strony, lim.get("strony", a.strony))
+    przerwa_co = min(x for x in (a.przerwa_co or 10**9, lim.get("przerwa_co", 10**9)))
+    if lim:
+        print(f"[{sklep}] limity sklepu: tempo ×{tempo.mnoznik:.1f}, max {max_ofert} ofert, "
+              f"{strony} str. na frazę, długa przerwa co {przerwa_co}")
     try:
         linki = {}
         for fr in frazy:
             print(f"\n[{sklep}] Fraza: {fr}")
-            for u, karta in zbierz_linki(page, sklep, fr, a.strony, a.headless, tempo).items():
+            for u, karta in zbierz_linki(page, sklep, fr, strony, a.headless, tempo).items():
                 linki.setdefault(u, karta)
         kandydaci = {u: k for u, k in linki.items() if u not in cache}
         if a.odswiez:  # stare wpisy AliExpress (tekst strony z reklamami)
@@ -854,7 +899,7 @@ def szukaj_w_sklepie(pw, a, nazwa, profil, sklep, frazy, caches):
         else:
             ocenione = sorted(((ocen_tytul(k, profil), u, k) for u, k in kandydaci.items()),
                               key=lambda x: -x[0][0])
-        do_pobrania = [u for (o, _), u, _ in ocenione if o >= a.prog_listy][: a.max]
+        do_pobrania = [u for (o, _), u, _ in ocenione if o >= a.prog_listy][: max_ofert]
         pominiete = [(o, pw_, k) for (o, pw_), u, k in ocenione if o < a.prog_listy]
         print(f"\n[{sklep}] Znaleziono {len(linki)} ofert: {len(linki) - len(kandydaci)} już w cache, "
               f"{len(pominiete)} odrzuconych po tytule, do otwarcia: {len(do_pobrania)}")
@@ -873,12 +918,12 @@ def szukaj_w_sklepie(pw, a, nazwa, profil, sklep, frazy, caches):
                     podglad(d, profil, u, a.min_ocena)
                     # raport na bieżąco – można odświeżać w przeglądarce
                     zapisz_raport(ocen_wszystko(caches, profil, a.min_ocena), nazwa, profil)
-            except KoniecSzukania:
+            except (KoniecSzukania, SklepZablokowal):
                 raise
             except Exception as e:
                 print(f"   błąd: {str(e).splitlines()[0]}")
             if i < len(do_pobrania):
-                tempo.po_aukcji(a.przerwa_co)
+                tempo.po_aukcji(przerwa_co if przerwa_co < 10**9 else 0)
     finally:
         plik_c.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
         try:
@@ -922,6 +967,8 @@ def main():
                     help="tylko otwórz przeglądarkę z głównym profilem (zaloguj się, zaakceptuj cookies)")
     ap.add_argument("--chrome", metavar="ŚCIEŻKA",
                     help="użyj innej przeglądarki, np. /usr/bin/chromium (pacman -S chromium)")
+    ap.add_argument("--ignoruj-blokade", action="store_true",
+                    help=f"szukaj też w sklepie, który zablokował nas w ciągu {BLOKADA_GODZIN} h")
     ap.add_argument("--cicho", action="store_true", help="bez dźwięku i powiadomień przy captchy")
     ap.add_argument("--headless", action="store_true", help="bez okna (captchy nie da się wtedy rozwiązać)")
     a = ap.parse_args()
@@ -954,7 +1001,7 @@ def main():
         sklepy = list(SKLEPY)
     else:
         sklepy = a.sklep or profil["sklepy"] or ["aliexpress"]
-    print(f"Profil: {nazwa} – {profil['opis']}\nSklepy: {', '.join(sklepy)}")
+    print(f"Profil: {nazwa} – {profil['opis']}\nSklepy (po kolei): {' → '.join(sklepy)}")
 
     DANE.mkdir(exist_ok=True)
     # raport obejmuje wszystkie sklepy, w których ten profil kiedykolwiek szukał
@@ -979,10 +1026,23 @@ def main():
                 ctx.close()
                 return
             try:
-                for s in sklepy:
+                for nr, s in enumerate(sklepy, 1):
                     frazy = a.frazy or profil["frazy_sklep"].get(s) or profil["frazy"]
+                    dalej = f" (potem: {', '.join(sklepy[nr:])})" if nr < len(sklepy) else " (ostatni)"
+                    print(f"\n{'=' * 60}\n=== Sklep {nr}/{len(sklepy)}: {s}{dalej}\n{'=' * 60}")
+                    godz = zablokowany_od(s)
+                    if godz is not None and godz < BLOKADA_GODZIN and not a.ignoruj_blokade:
+                        print(f"[{s}] pomijam: sklep zablokował nas {godz:.1f} h temu "
+                              f"(czekamy {BLOKADA_GODZIN} h; --ignoruj-blokade, żeby spróbować mimo to)")
+                        continue
                     try:
                         szukaj_w_sklepie(pw, a, nazwa, profil, s, frazy, caches)
+                        plik_blokady(s).unlink(missing_ok=True)
+                    except SklepZablokowal:
+                        plik_blokady(s).write_text(time.strftime("%Y-%m-%d %H:%M"), encoding="utf-8")
+                        alarm(f"{s}: zablokowano dostęp", "Kończę z tym sklepem, przechodzę dalej.")
+                        print(f"\n[{s}] SKLEP NAS ZABLOKOWAŁ – przerywam zapytania do niego (dalsze tylko "
+                              f"przedłużają blokadę). Kolejne uruchomienia pominą go przez {BLOKADA_GODZIN} h.")
                     except (KeyboardInterrupt, KoniecSzukania):
                         raise
                     except Exception as e:

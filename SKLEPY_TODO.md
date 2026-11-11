@@ -18,6 +18,7 @@ Każdy sklep to wpis w słowniku `SKLEPY` w `scrapper.py`:
 | `parametry` | nie | `(początek, koniec)` – wyrażenia ograniczające blok parametrów w tekście strony; linie w bloku są brane parami *klucz / wartość* |
 | `pomin_linie` | nie | wyrażenie: linie w bloku parametrów do pominięcia (np. przyciski) |
 | `bez_oceny_listy` | nie | `True`, gdy lista wyników nie pokazuje tytułów; wyłącza wstępną ocenę po tytule |
+| `limity` | nie | stałe limity sklepu, np. `{"tempo": 2.5, "max": 15, "strony": 2, "przerwa_co": 5}`; opcje z linii poleceń mogą je tylko zaostrzyć |
 | `jezyk` | auto | `en` dla AliExpress, `pl` dla pozostałych; decyduje, czy profil użyje `frazy_pl` |
 
 Poza wpisem w `SKLEPY` trzeba jeszcze dopisać domenę w `sklep_z_url()` (rozpoznaje sklep po adresie).
@@ -85,6 +86,10 @@ nie bierzemy pod uwagę, bo niewidoczna reCAPTCHA jest też na zwykłych stronac
   np. „E27” z polecanej oferty.
 - **Captcha:** DataDome (`captcha-delivery.com`) albo reCAPTCHA z tekstem „nie jestem robotem”.
   Pojawia się po kilku do kilkunastu ofertach.
+- **Blokada IP:** po ok. 120 ofertach w ok. 4 h (dwa profile naraz, `--tempo 1.5`) Allegro pokazało
+  stronę „Zostałeś zablokowany” z adresem IP. Tego nie da się rozwiązać jak captchy. Skrypt
+  rozpoznaje ją (`BLOKADA_W_TEKSCIE`), przerywa sklep i zapisuje `dane/blokada_allegro.txt`
+  (pomijanie przez 24 h). Stąd stałe `limity` Allegro w `SKLEPY`.
 
 ---
 

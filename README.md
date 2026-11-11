@@ -135,6 +135,15 @@ Dźwięk powtarza się co 30 s przez pierwsze 3 minuty. `--cicho` wyłącza dźw
 - **Limit czasu:** po 10 minutach bez rozwiązania aukcja jest pomijana automatycznie.
 - **Ctrl+C:** w każdej chwili przerywa wyszukiwanie i robi raport z tego, co już pobrane.
 
+**Blokada sklepu.** Gdy sklep zamiast captchy pokaże stronę „Zostałeś zablokowany” (Allegro robi to
+po ok. 100–150 ofertach w krótkim czasie), skrypt od razu przestaje go odpytywać i przechodzi do
+następnego sklepu. Blokada zapisuje się w `dane/blokada_<sklep>.txt`, a kolejne uruchomienia
+pomijają ten sklep przez 24 h (`--ignoruj-blokade`, żeby spróbować wcześniej).
+
+**Limity Allegro.** Allegro ma w skrypcie stałe limity, które opcje mogą tylko zaostrzyć:
+tempo ×2,5, najwyżej 15 ofert i 2 strony wyników na frazę na jedno uruchomienie oraz długa
+przerwa co 5 ofert. Większe przeszukanie Allegro rozłóż więc na kilka uruchomień w ciągu dnia.
+
 Jak ograniczyć liczbę captchy:
 
 - **Zaloguj się:** użyj `--przegladarka`, jak w kroku 1 powyżej.
@@ -205,6 +214,7 @@ ich wiarygodnie ocenić. Skrypt podaje na końcu, ile ich jest. `--odswiez` pobi
 | `--tylko-ocena` | | nic nie pobieraj, tylko przelicz raport z cache |
 | `--przegladarka` | | tylko otwórz okno (logowanie, cookies) |
 | `--chrome ŚCIEŻKA` | | użyj innej przeglądarki, np. `/usr/bin/chromium` |
+| `--ignoruj-blokade` | | szukaj też w sklepie, który zablokował nas w ciągu ostatnich 24 h |
 | `--cicho` | | bez dźwięku i powiadomień przy captchy |
 | `--headless` | | bez okna; captchy nie da się wtedy rozwiązać, niezalecane |
 
@@ -546,6 +556,15 @@ and notifications off.
 - **Timeout:** after 10 minutes without a solution the listing is skipped automatically.
 - **Ctrl+C:** stops at any time and still writes the report.
 
+**Shop blocks.** When a shop shows a "Zostałeś zablokowany" (you have been blocked) page instead of
+a captcha (Allegro does this after roughly 100–150 listings in a short time), the script stops
+querying it immediately and moves on to the next shop. The block is saved in
+`dane/blokada_<shop>.txt`, and later runs skip that shop for 24 h (`--ignoruj-blokade` to try earlier).
+
+**Allegro limits.** Allegro has fixed limits in the script that options can only tighten:
+pace ×2.5, at most 15 listings and 2 result pages per phrase per run, and a long break every
+5 listings. Spread a bigger Allegro search over several runs during the day.
+
 To get fewer captchas:
 
 - **Log in** with `--przegladarka`.
@@ -614,6 +633,7 @@ can't be scored reliably. The script tells you at the end how many there are. `-
 | `--tylko-ocena` | scoring only | | don't download anything, just rebuild the report from cache |
 | `--przegladarka` | browser | | only open the browser window (log in, accept cookies) |
 | `--chrome PATH` | | | use another browser binary, e.g. `/usr/bin/chromium` |
+| `--ignoruj-blokade` | ignore block | | also search a shop that blocked us in the last 24 h |
 | `--cicho` | quiet | | no sound or notifications on captchas |
 | `--headless` | | | no window; captchas cannot be solved, not recommended |
 
